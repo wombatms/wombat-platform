@@ -21,7 +21,7 @@ from __future__ import annotations
 import uuid
 from typing import Literal
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from wombat_api.database.models import Content, ContentChunk
@@ -137,9 +137,7 @@ async def _postgres_search(
     mode: str,
     include_chunks: bool,
 ) -> list[dict]:
-    from sqlalchemy import literal_column, cast
-    from sqlalchemy.dialects.postgresql import ARRAY
-    from sqlalchemy import Float
+    from sqlalchemy import literal_column
 
     # Build base filters.
     conds = [
@@ -155,9 +153,7 @@ async def _postgres_search(
 
     # Score expressions.
     # pgvector: Content.embedding.cosine_distance(...) returns a float column.
-    cos_score = (
-        literal_column("1.0") - Content.embedding.cosine_distance(query_embedding)
-    ).label("cos_score")
+    cos_score = (literal_column("1.0") - Content.embedding.cosine_distance(query_embedding)).label("cos_score")
 
     ts_query_expr = func.plainto_tsquery("english", query)
     bm25_score = func.ts_rank_cd(literal_column("fts"), ts_query_expr).label("bm25_score")
@@ -168,16 +164,11 @@ async def _postgres_search(
     # test suite can verify the weights without Postgres.
     combined = (w_cos * cos_score + w_bm * bm25_score).label("score")
 
-    q = (
-        select(Content, cos_score, bm25_score, combined)
-        .where(*conds)
-        .order_by(combined.desc())
-        .limit(top_k)
-    )
+    q = select(Content, cos_score, bm25_score, combined).where(*conds).order_by(combined.desc()).limit(top_k)
     rows = (await session.execute(q)).all()
 
     hits: list[dict] = []
-    for c, cs, bs, sc in rows:
+    for c, _cs, _bs, sc in rows:
         hits.append(_content_hit(c, float(sc)))
 
     # Chunk-level hits for docs.
@@ -203,9 +194,7 @@ async def _chunk_search_postgres(
 ) -> list[dict]:
     from sqlalchemy import literal_column
 
-    chunk_cos = (
-        literal_column("1.0") - ContentChunk.embedding.cosine_distance(query_embedding)
-    ).label("cos_score")
+    chunk_cos = (literal_column("1.0") - ContentChunk.embedding.cosine_distance(query_embedding)).label("cos_score")
 
     qc = (
         select(ContentChunk, Content, chunk_cos)
@@ -222,20 +211,22 @@ async def _chunk_search_postgres(
     crows = (await session.execute(qc)).all()
     hits: list[dict] = []
     for ch, parent, cs in crows:
-        hits.append({
-            "id": str(parent.id),
-            "kind": "doc",
-            "wombat_id": parent.wombat_id,
-            "title": parent.title,
-            "score": float(cs) * W_COS,
-            "snippet": ch.text[:280],
-            "chunk_index": ch.chunk_index,
-            "source": {
-                "repo": parent.source_repo,
-                "path": parent.source_path,
-                "revision": parent.source_revision,
-            },
-        })
+        hits.append(
+            {
+                "id": str(parent.id),
+                "kind": "doc",
+                "wombat_id": parent.wombat_id,
+                "title": parent.title,
+                "score": float(cs) * W_COS,
+                "snippet": ch.text[:280],
+                "chunk_index": ch.chunk_index,
+                "source": {
+                    "repo": parent.source_repo,
+                    "path": parent.source_path,
+                    "revision": parent.source_revision,
+                },
+            }
+        )
     return hits
 
 
@@ -270,9 +261,7 @@ async def _sqlite_semantic_search(
     # Tag containment: under SQLite the JSON column is stored as text, so we
     # skip the tag filter here for simplicity (test data is small).
 
-    rows = list(
-        (await session.execute(select(Content).where(*conds))).scalars()
-    )
+    rows = list((await session.execute(select(Content).where(*conds))).scalars())
 
     scored: list[tuple[float, Content]] = []
     for row in rows:
@@ -298,7 +287,7 @@ def _cosine(a: list[float], b: list[float]) -> float:
     """Compute cosine similarity between two float vectors."""
     if len(a) != len(b):
         return 0.0
-    dot = sum(x * y for x, y in zip(a, b))
+    dot = sum(x * y for x, y in zip(a, b, strict=False))
     mag_a = sum(x * x for x in a) ** 0.5
     mag_b = sum(x * x for x in b) ** 0.5
     if mag_a == 0 or mag_b == 0:

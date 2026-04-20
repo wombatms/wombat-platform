@@ -5,11 +5,13 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import and_, func, or_, select, update as sa_update, delete as sa_delete
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import update as sa_update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from wombat_api.database.models import (
     APITokenDB,
@@ -28,14 +30,12 @@ from wombat_api.schemas.common import (
     ProjectCreate,
     RunCreate,
     RunSummary,
-    SyncSummary,
     UserCreate,
 )
 
 
 def canonical_json(body: dict) -> str:
-    return json.dumps(body, sort_keys=True, separators=(",", ":"),
-                      ensure_ascii=False)
+    return json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
 def content_hash_for(body: dict) -> str:
@@ -74,7 +74,8 @@ class Repository:
 
     async def create_user(self, user: UserCreate, hashed_pw: str) -> UserDB:
         row = UserDB(
-            email=user.email, hashed_password=hashed_pw,
+            email=user.email,
+            hashed_password=hashed_pw,
             display_name=user.display_name,
         )
         self.session.add(row)
@@ -82,7 +83,9 @@ class Repository:
         return row
 
     async def get_user_role(
-        self, user_id: uuid.UUID, project_id: uuid.UUID,
+        self,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID,
     ) -> str | None:
         q = select(UserProjectRoleDB.role).where(
             and_(
@@ -93,10 +96,15 @@ class Repository:
         return (await self.session.execute(q)).scalar_one_or_none()
 
     async def set_user_role(
-        self, user_id: uuid.UUID, project_id: uuid.UUID, role: str,
+        self,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID,
+        role: str,
     ) -> None:
         stmt = pg_insert(UserProjectRoleDB.__table__).values(
-            user_id=user_id, project_id=project_id, role=role,
+            user_id=user_id,
+            project_id=project_id,
+            role=role,
         )
         stmt = stmt.on_conflict_do_update(
             index_elements=["user_id", "project_id"],
@@ -105,7 +113,9 @@ class Repository:
         await self.session.execute(stmt)
 
     async def remove_user_role(
-        self, user_id: uuid.UUID, project_id: uuid.UUID,
+        self,
+        user_id: uuid.UUID,
+        project_id: uuid.UUID,
     ) -> None:
         await self.session.execute(
             sa_delete(UserProjectRoleDB).where(
@@ -117,7 +127,8 @@ class Repository:
         )
 
     async def list_project_members(
-        self, project_id: uuid.UUID,
+        self,
+        project_id: uuid.UUID,
     ) -> list[tuple[UserDB, str]]:
         q = (
             select(UserDB, UserProjectRoleDB.role)
@@ -129,12 +140,19 @@ class Repository:
     # --- API Tokens -----------------------------------------------------------
 
     async def create_api_token(
-        self, user_id: uuid.UUID, name: str, scopes: list[str],
-        token_hash: str, expires_at: datetime | None,
+        self,
+        user_id: uuid.UUID,
+        name: str,
+        scopes: list[str],
+        token_hash: str,
+        expires_at: datetime | None,
     ) -> APITokenDB:
         row = APITokenDB(
-            user_id=user_id, name=name, scopes=scopes,
-            token_hash=token_hash, expires_at=expires_at,
+            user_id=user_id,
+            name=name,
+            scopes=scopes,
+            token_hash=token_hash,
+            expires_at=expires_at,
         )
         self.session.add(row)
         await self.session.flush()
@@ -149,14 +167,15 @@ class Repository:
         return list((await self.session.execute(q)).scalars())
 
     async def delete_token(self, token_id: uuid.UUID) -> None:
-        await self.session.execute(
-            sa_delete(APITokenDB).where(APITokenDB.id == token_id)
-        )
+        await self.session.execute(sa_delete(APITokenDB).where(APITokenDB.id == token_id))
 
     # --- Content (unified) ----------------------------------------------------
 
     async def get_content_by_wombat_id(
-        self, project_id: uuid.UUID, kind: str, wombat_id: str,
+        self,
+        project_id: uuid.UUID,
+        kind: str,
+        wombat_id: str,
     ) -> Content | None:
         q = select(Content).where(
             and_(
@@ -172,7 +191,10 @@ class Repository:
         return await self.session.get(Content, content_id)
 
     async def get_content_by_path(
-        self, project_id: uuid.UUID, source_repo: str, source_path: str,
+        self,
+        project_id: uuid.UUID,
+        source_repo: str,
+        source_path: str,
     ) -> Content | None:
         """Look up a content row by its source location (used for docs without wombat_id)."""
         q = select(Content).where(
@@ -198,23 +220,32 @@ class Repository:
         if kind is not None:
             conds.append(Content.kind == kind)
         if tags:
-            # JSON array containment; PG-specific. Portable SQLite path:
-            # fallback to LIKE on serialized tags for tests only.
-            for t in tags:
-                conds.append(Content.tags.contains([t]))
+            # JSONB @> containment (Postgres only).
+            # We use bindparam(..., type_=JSONB) with a Python list value so that
+            # asyncpg encodes it correctly as JSONB.  On SQLite (unit tests) tag
+            # filtering is skipped — there are no tag-filter unit tests and SQLite
+            # has no JSONB @> operator.  Dialect is detected via the session bind.
+            _dialect = self.session.bind.dialect.name if self.session.bind else "postgresql"
+            if _dialect == "postgresql":
+                from sqlalchemy import bindparam
+                from sqlalchemy.dialects.postgresql import JSONB as _JSONB
+
+                for i, t in enumerate(tags):
+                    param = bindparam(f"_tag_{i}", value=[t], type_=_JSONB, unique=True)
+                    conds.append(Content.tags.op("@>")(param))
+            # else: SQLite — skip tag filtering
         if q_text:
             like = f"%{q_text}%"
-            conds.append(or_(Content.title.ilike(like),))
+            conds.append(
+                or_(
+                    Content.title.ilike(like),
+                )
+            )
         base = select(Content).where(and_(*conds))
         total_q = select(func.count()).select_from(base.subquery())
         total = (await self.session.execute(total_q)).scalar_one()
         rows = list(
-            (
-                await self.session.execute(
-                    base.order_by(Content.updated_at.desc())
-                        .limit(limit).offset(offset)
-                )
-            ).scalars()
+            (await self.session.execute(base.order_by(Content.updated_at.desc()).limit(limit).offset(offset))).scalars()
         )
         return rows, total
 
@@ -244,12 +275,18 @@ class Repository:
         existing = (await self.session.execute(q)).scalar_one_or_none()
         if existing is None:
             row = Content(
-                project_id=project_id, kind=kind, wombat_id=wombat_id,
-                title=title, tags=tags, body=body,
-                source_repo=source_repo, source_path=source_path,
-                source_revision=source_revision, content_hash=h,
+                project_id=project_id,
+                kind=kind,
+                wombat_id=wombat_id,
+                title=title,
+                tags=tags,
+                body=body,
+                source_repo=source_repo,
+                source_path=source_path,
+                source_revision=source_revision,
+                content_hash=h,
                 embedding=embedding,
-                synced_at=datetime.now(timezone.utc),
+                synced_at=datetime.now(UTC),
             )
             self.session.add(row)
             await self.session.flush()
@@ -262,26 +299,32 @@ class Repository:
         existing.body = body
         existing.source_revision = source_revision
         existing.content_hash = h
-        existing.synced_at = datetime.now(timezone.utc)
+        existing.synced_at = datetime.now(UTC)
         if embedding is not None:
             existing.embedding = embedding
         return existing
 
     async def replace_chunks(
-        self, content_id: uuid.UUID,
+        self,
+        content_id: uuid.UUID,
         chunks: list[tuple[str, list[float] | None]],
     ) -> None:
         """Delete existing chunks and write the new set."""
-        await self.session.execute(
-            sa_delete(ContentChunk).where(ContentChunk.content_id == content_id)
-        )
+        await self.session.execute(sa_delete(ContentChunk).where(ContentChunk.content_id == content_id))
         for i, (text, emb) in enumerate(chunks):
-            self.session.add(ContentChunk(
-                content_id=content_id, chunk_index=i, text=text, embedding=emb,
-            ))
+            self.session.add(
+                ContentChunk(
+                    content_id=content_id,
+                    chunk_index=i,
+                    text=text,
+                    embedding=emb,
+                )
+            )
 
     async def soft_delete_missing(
-        self, project_id: uuid.UUID, source_repo: str,
+        self,
+        project_id: uuid.UUID,
+        source_repo: str,
         seen_paths: set[str],
     ) -> int:
         """Soft-delete rows from a source_repo whose path was not seen this sync."""
@@ -294,7 +337,7 @@ class Repository:
         )
         rows = list((await self.session.execute(q)).scalars())
         n = 0
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for r in rows:
             if r.source_path not in seen_paths:
                 r.deleted_at = now
@@ -304,12 +347,18 @@ class Repository:
     # --- Runs / Results -------------------------------------------------------
 
     async def create_run(
-        self, project_id: uuid.UUID, run: RunCreate, triggered_by: str,
+        self,
+        project_id: uuid.UUID,
+        run: RunCreate,
+        triggered_by: str,
     ) -> RunDB:
         row = RunDB(
-            project_id=project_id, title=run.title,
-            plan_wombat_id=run.plan_wombat_id, environment=run.environment,
-            assignees=run.assignees, source=run.source,
+            project_id=project_id,
+            title=run.title,
+            plan_wombat_id=run.plan_wombat_id,
+            environment=run.environment,
+            assignees=run.assignees,
+            source=run.source,
             triggered_by=triggered_by,
         )
         self.session.add(row)
@@ -320,40 +369,51 @@ class Repository:
         return await self.session.get(RunDB, run_id)
 
     async def list_runs(
-        self, project_id: uuid.UUID, limit: int, offset: int,
+        self,
+        project_id: uuid.UUID,
+        limit: int,
+        offset: int,
     ) -> list[RunDB]:
         q = (
             select(RunDB)
             .where(RunDB.project_id == project_id)
             .order_by(RunDB.created_at.desc())
-            .limit(limit).offset(offset)
+            .limit(limit)
+            .offset(offset)
         )
         return list((await self.session.execute(q)).scalars())
 
     async def update_run_status(self, run_id: uuid.UUID, status: str) -> None:
-        await self.session.execute(
-            sa_update(RunDB).where(RunDB.id == run_id).values(status=status)
-        )
+        await self.session.execute(sa_update(RunDB).where(RunDB.id == run_id).values(status=status))
 
     async def bulk_add_results(
-        self, run_id: uuid.UUID, results: list[ExecutionResultCreate],
+        self,
+        run_id: uuid.UUID,
+        results: list[ExecutionResultCreate],
         resolve_content_id,  # callable(wombat_id) -> UUID
     ) -> int:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         created = 0
         for r in results:
             cid = await resolve_content_id(r.testcase_id)
             if cid is None:
                 continue
-            self.session.add(ExecutionResultDB(
-                run_id=run_id, content_id=cid,
-                wombat_testcase_id=r.testcase_id, status=r.status,
-                duration_ms=r.duration_ms, environment=r.environment,
-                automated=r.automated, notes=r.notes,
-                bug_references=r.bug_references,
-                evidence_references=r.evidence_references,
-                raw_payload=r.raw_payload, executed_at=now,
-            ))
+            self.session.add(
+                ExecutionResultDB(
+                    run_id=run_id,
+                    content_id=cid,
+                    wombat_testcase_id=r.testcase_id,
+                    status=r.status,
+                    duration_ms=r.duration_ms,
+                    environment=r.environment,
+                    automated=r.automated,
+                    notes=r.notes,
+                    bug_references=r.bug_references,
+                    evidence_references=r.evidence_references,
+                    raw_payload=r.raw_payload,
+                    executed_at=now,
+                )
+            )
             created += 1
         return created
 
@@ -372,9 +432,12 @@ class Repository:
                 total_duration += int(dur)
         total = sum(bucket.values())
         return RunSummary(
-            run_id=run_id, total=total,
-            passed=bucket["pass"], failed=bucket["fail"],
-            blocked=bucket["block"], skipped=bucket["skip"],
+            run_id=run_id,
+            total=total,
+            passed=bucket["pass"],
+            failed=bucket["fail"],
+            blocked=bucket["block"],
+            skipped=bucket["skip"],
             errored=bucket["error"],
             duration_ms=total_duration or None,
         )
@@ -397,23 +460,30 @@ class Repository:
         interface: str,
         agent_type: str | None,
     ) -> None:
-        self.session.add(AuditLogDB(
-            project_id=project_id, user_id=user_id, action=action,
-            entity_type=entity_type, entity_id=entity_id, details=details,
-            interface=interface, agent_type=agent_type,
-        ))
+        self.session.add(
+            AuditLogDB(
+                project_id=project_id,
+                user_id=user_id,
+                action=action,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                details=details,
+                interface=interface,
+                agent_type=agent_type,
+            )
+        )
 
     async def get_audit_log(
-        self, project_id: uuid.UUID, filters: dict, limit: int, offset: int,
+        self,
+        project_id: uuid.UUID,
+        filters: dict,
+        limit: int,
+        offset: int,
     ) -> list[AuditLogDB]:
         conds = [AuditLogDB.project_id == project_id]
         if filters.get("entity_type"):
             conds.append(AuditLogDB.entity_type == filters["entity_type"])
         if filters.get("action"):
             conds.append(AuditLogDB.action == filters["action"])
-        q = (
-            select(AuditLogDB).where(and_(*conds))
-            .order_by(AuditLogDB.created_at.desc())
-            .limit(limit).offset(offset)
-        )
+        q = select(AuditLogDB).where(and_(*conds)).order_by(AuditLogDB.created_at.desc()).limit(limit).offset(offset)
         return list((await self.session.execute(q)).scalars())

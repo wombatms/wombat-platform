@@ -45,11 +45,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from wombat_core.models.testcase import TestCase
-
-from wombat_core.importing.parser import parse_xlsx, parse_csv
 from wombat_core.importing.mapping import MappingProfile, load_profile
+from wombat_core.importing.parser import parse_csv, parse_xlsx
 from wombat_core.importing.transformer import transform_rows
+from wombat_core.models.testcase import TestCase
 
 
 @dataclass
@@ -86,15 +85,9 @@ def parse_file(
     elif suffix == ".csv":
         headers, rows = parse_csv(path)
     else:
-        raise ValueError(
-            f"Unsupported file type '{suffix}'. "
-            "Supported: .xlsx, .xlsm, .xltx, .xltm, .csv"
-        )
+        raise ValueError(f"Unsupported file type '{suffix}'. Supported: .xlsx, .xlsm, .xltx, .xltm, .csv")
 
-    if mapping_file is not None:
-        profile = MappingProfile.from_yaml(mapping_file)
-    else:
-        profile = load_profile(profile_name)
+    profile = MappingProfile.from_yaml(mapping_file) if mapping_file is not None else load_profile(profile_name)
 
     return transform_rows(headers, rows, profile)
 

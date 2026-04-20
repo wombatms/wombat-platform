@@ -9,7 +9,6 @@ Currently provides:
 from __future__ import annotations
 
 import os
-import sys
 from typing import Annotated
 
 import typer
@@ -123,10 +122,10 @@ def _server_preview(
             r.raise_for_status()
     except httpx.HTTPStatusError as exc:
         typer.echo(f"Error: HTTP {exc.response.status_code} — {exc.response.text}", err=True)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
     except httpx.RequestError as exc:
         typer.echo(f"Error: request failed — {exc}", err=True)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     data = r.json()
     hits = data.get("hits", [])
@@ -157,8 +156,8 @@ def _local_preview(
     import asyncio
 
     async def _run() -> list[dict]:
-        from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-        from wombat_api.database.repository import Repository
+        from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
         from wombat_api.search.hybrid import hybrid_search
         from wombat_core.rag.embedders import load_embedder
 
@@ -172,13 +171,10 @@ def _local_preview(
         async with async_session() as session:
             # Resolve project slug → project_id
             from sqlalchemy import select
+
             from wombat_api.database.models import ProjectDB
 
-            proj = (
-                await session.execute(
-                    select(ProjectDB).where(ProjectDB.slug == project_slug)
-                )
-            ).scalar_one_or_none()
+            proj = (await session.execute(select(ProjectDB).where(ProjectDB.slug == project_slug))).scalar_one_or_none()
             if proj is None:
                 typer.echo(f"Error: project '{project_slug}' not found.", err=True)
                 raise typer.Exit(1)
@@ -200,8 +196,8 @@ def _local_preview(
 
 def _print_hits_table(query: str, hits: list[dict], mode: str) -> None:
     try:
-        from rich.table import Table
         from rich.console import Console
+        from rich.table import Table
 
         console = Console()
         table = Table(title=f'RAG preview — "{query}" (mode={mode})')

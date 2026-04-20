@@ -7,12 +7,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from wombat_api.database.repository import Repository, content_hash_for
-from wombat_core.rag.chunking import chunk_markdown, chunk_text, should_chunk
+from wombat_core.config.models import AppRepoSource, RagSourcesConfig
+from wombat_core.rag.chunking import chunk_markdown, should_chunk
 from wombat_core.rag.embedders.base import Embedder
 from wombat_core.rag.pdf import extract_pdf_text
 from wombat_core.rag.sources import ResolvedFile, SourceResolver
-from wombat_core.config.models import AppRepoSource, RagSourcesConfig
-
 
 _AUTHORED_KIND_BY_DIR = {
     "testcases": "testcase",
@@ -78,9 +77,12 @@ class Indexer:
             try:
                 parsed = self._parse_file(rf)
             except Exception as e:
-                progress.errors.append({
-                    "path": rf.source_path, "error": str(e),
-                })
+                progress.errors.append(
+                    {
+                        "path": rf.source_path,
+                        "error": str(e),
+                    }
+                )
                 continue
             if parsed is None:
                 continue
@@ -91,12 +93,16 @@ class Indexer:
             if parsed.get("wombat_id"):
                 # Authored kinds: key by wombat_id.
                 existing = await self._repo.get_content_by_wombat_id(
-                    project_id, parsed["kind"], parsed["wombat_id"],
+                    project_id,
+                    parsed["kind"],
+                    parsed["wombat_id"],
                 )
             else:
                 # Docs: key by source path.
                 existing = await self._repo.get_content_by_path(
-                    project_id, rf.source_repo, rf.source_path,
+                    project_id,
+                    rf.source_repo,
+                    rf.source_path,
                 )
 
             if existing is not None and existing.content_hash == h:
@@ -114,12 +120,13 @@ class Indexer:
             batch = pending_embed[i : i + self._batch_size]
             embed_texts: list[str] = []
             chunks_per_item: list[list[str] | None] = []
-            for rf, parsed in batch:
+            for _rf, parsed in batch:
                 if parsed["kind"] == "doc":
                     text = parsed["body"]["text"]
                     if should_chunk(text, max_tokens=self._chunk_size):
                         chs = chunk_markdown(
-                            text, max_tokens=self._chunk_size,
+                            text,
+                            max_tokens=self._chunk_size,
                             overlap_tokens=self._chunk_overlap,
                         )
                         chunks_per_item.append(chs)
@@ -134,7 +141,7 @@ class Indexer:
 
             # Distribute vectors back
             v_iter = iter(vectors)
-            for (rf, parsed), chs in zip(batch, chunks_per_item):
+            for (rf, parsed), chs in zip(batch, chunks_per_item, strict=False):
                 if chs is None:
                     emb = next(v_iter)
                     row = await self._repo.upsert_content(
@@ -166,7 +173,7 @@ class Indexer:
                     )
                     await self._repo.replace_chunks(
                         row.id,
-                        [(t, v) for t, v in zip(chs, chunk_embs)],
+                        [(t, v) for t, v in zip(chs, chunk_embs, strict=False)],
                     )
                 progress.embedded += 1
                 if on_progress:
@@ -188,11 +195,10 @@ class Indexer:
             if kind is None:
                 return None
             from wombat_core.parsing import parse_markdown_file
+
             result = parse_markdown_file(rf.absolute_path)
             if not result.ok:
-                raise ValueError(
-                    f"Parse error in {rf.source_path}: {result.error}"
-                )
+                raise ValueError(f"Parse error in {rf.source_path}: {result.error}")
             entity = result.entity
             body = entity.model_dump(mode="json")
             return {
@@ -232,10 +238,7 @@ def _embed_text_for(parsed: dict) -> str:
     body = parsed.get("body", {})
     summary = body.get("summary") or ""
     steps = body.get("steps") or []
-    step_text = " ".join(
-        (s.get("description") or s.get("action") or "")
-        for s in steps if isinstance(s, dict)
-    )
+    step_text = " ".join((s.get("description") or s.get("action") or "") for s in steps if isinstance(s, dict))
     raw = f"{title}\n\n{summary}\n\n{step_text}".strip()
     return raw[:2000]
 

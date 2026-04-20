@@ -5,7 +5,6 @@ from __future__ import annotations
 # Implemented in Task 22; stub only at Task 19 time.
 # The full implementation lives below and is activated once wombat_core.importing
 # is available (Task 21).
-
 from pathlib import Path
 from typing import Annotated
 
@@ -78,7 +77,7 @@ def import_command(
       Upload the file to ``POST /api/projects/{slug}/imports/upload`` and
       print the server-side import summary.
     """
-    from wombat_core.importing import parse_file, apply_profile, ImportResult
+    from wombat_core.importing import ImportResult, parse_file
 
     if server:
         _api_import(
@@ -103,17 +102,19 @@ def import_command(
 
 
 def _print_preview(result, *, dry_run: bool, json_output: bool) -> None:
-    from wombat_cli.formatting import print_json, err_console
+    from wombat_cli.formatting import print_json
 
     mode = "dry-run" if dry_run else "preview"
     if json_output:
-        print_json({
-            "mode": mode,
-            "parsed": len(result.entities),
-            "skipped": len(result.skipped),
-            "errors": [e for e in result.errors],
-            "entities": [e.model_dump(mode="json") for e in result.entities],
-        })
+        print_json(
+            {
+                "mode": mode,
+                "parsed": len(result.entities),
+                "skipped": len(result.skipped),
+                "errors": [e for e in result.errors],
+                "entities": [e.model_dump(mode="json") for e in result.entities],
+            }
+        )
     else:
         typer.echo(f"[{mode}] Parsed {len(result.entities)} entity/entities.")
         if result.skipped:
@@ -125,8 +126,8 @@ def _print_preview(result, *, dry_run: bool, json_output: bool) -> None:
 
 
 def _write_entities(result, *, output_dir: Path, json_output: bool) -> None:
-    from wombat_core.parsing.writer import write_entity
     from wombat_cli.formatting import print_json
+    from wombat_core.parsing.writer import write_entity
 
     output_dir.mkdir(parents=True, exist_ok=True)
     written = 0
@@ -136,11 +137,13 @@ def _write_entities(result, *, output_dir: Path, json_output: bool) -> None:
         written += 1
 
     if json_output:
-        print_json({
-            "written": written,
-            "skipped": len(result.skipped),
-            "errors": result.errors,
-        })
+        print_json(
+            {
+                "written": written,
+                "skipped": len(result.skipped),
+                "errors": result.errors,
+            }
+        )
     else:
         typer.echo(f"Wrote {written} file(s) to {output_dir}.")
         if result.errors:
@@ -178,10 +181,10 @@ def _api_import(
             r.raise_for_status()
     except httpx.HTTPStatusError as exc:
         typer.echo(f"Error: HTTP {exc.response.status_code} — {exc.response.text}", err=True)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
     except httpx.RequestError as exc:
         typer.echo(f"Error: request failed — {exc}", err=True)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     data = r.json()
     typer.echo(

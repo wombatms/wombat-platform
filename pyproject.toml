@@ -32,8 +32,27 @@ dev = [
     "testcontainers[postgres]>=4.0",
 ]
 
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+# B008: Do not perform function calls in argument defaults.
+# FastAPI uses Depends()/Query()/File() in default arguments by design;
+# this rule produces false positives for all FastAPI route signatures.
+# We suppress it project-wide since every route file triggers it.
+ignore = ["B008"]
+select = ["E", "F", "B", "I", "SIM", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# Migration files: imports are intentionally structured for Alembic conventions.
+"migrations/*" = ["E402", "I001"]
+# Test files: unused variables in pytest fixtures are common patterns.
+"tests/*" = ["F841"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 markers = [
     "postgres: marks tests that require a live Postgres instance (skip unless WOMBAT_TEST_DATABASE_URL is set)",
+    "slow: marks tests that take longer than usual (full E2E pipelines, large fixtures)",
 ]

@@ -24,18 +24,18 @@ from __future__ import annotations
 
 import os
 import uuid
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.asyncio import (
-    AsyncSession,
     AsyncEngine,
-    create_async_engine,
+    AsyncSession,
     async_sessionmaker,
+    create_async_engine,
 )
+from sqlalchemy.pool import NullPool
 
 # ---------------------------------------------------------------------------
 # Docker / testcontainers guard
@@ -48,6 +48,7 @@ def _check_docker_available() -> bool:
     """Return True if Docker daemon is reachable."""
     try:
         import subprocess
+
         result = subprocess.run(
             ["docker", "info"],
             capture_output=True,
@@ -60,8 +61,7 @@ def _check_docker_available() -> bool:
 
 if _SHORT_CIRCUIT_URL is None and not _check_docker_available():
     pytest.skip(
-        "Docker is not available and WOMBAT_TEST_DATABASE_URL is not set; "
-        "skipping API integration tests.",
+        "Docker is not available and WOMBAT_TEST_DATABASE_URL is not set; skipping API integration tests.",
         allow_module_level=True,
     )
 
@@ -106,11 +106,11 @@ def pg_dsn() -> str:
 def _stop_pg_container():
     """Session teardown: stop testcontainers container if we started one."""
     yield
+    import contextlib
+
     for c in _pg_dsn_container_ref:
-        try:
+        with contextlib.suppress(Exception):
             c.stop()
-        except Exception:
-            pass
 
 
 @pytest.fixture(scope="session")
@@ -153,9 +153,11 @@ def _alembic_migrated(pg_dsn: str) -> None:
 
     # Always run create_all as belt-and-suspenders for the alembic_version
     # table and any tables not covered by the migration yet.
-    from sqlalchemy import create_engine, text as sa_text
-    from wombat_api.database.engine import Base
+    from sqlalchemy import create_engine
+    from sqlalchemy import text as sa_text
+
     from wombat_api.database import models as _models  # noqa: F401
+    from wombat_api.database.engine import Base
 
     # Convert asyncpg DSN to psycopg2 for sync Alembic check
     sync_dsn = pg_dsn.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
@@ -176,9 +178,7 @@ def _alembic_migrated(pg_dsn: str) -> None:
 
 
 @pytest_asyncio.fixture
-async def async_engine(
-    pg_dsn: str, _alembic_migrated: None
-) -> AsyncGenerator[AsyncEngine, None]:
+async def async_engine(pg_dsn: str, _alembic_migrated: None) -> AsyncGenerator[AsyncEngine, None]:
     """Function-scoped async SQLAlchemy engine.
 
     Uses NullPool so asyncpg connections are not cached across event loops.
@@ -297,9 +297,9 @@ async def users(
     Users are inserted directly (no registration endpoint) to avoid the
     bootstrap-lock on POST /api/auth/register.
     """
-    from wombat_api.database.models import UserDB, UserProjectRoleDB
-    from wombat_api.auth.passwords import hash_password
     from wombat_api.auth.jwt import create_access_token
+    from wombat_api.auth.passwords import hash_password
+    from wombat_api.database.models import UserDB, UserProjectRoleDB
 
     project, _slug = seeded_project
     result: dict = {}

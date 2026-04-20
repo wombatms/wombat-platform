@@ -49,6 +49,7 @@ def _is_wombat_id(value: str) -> bool:
 # GET /content/{content_id}
 # ---------------------------------------------------------------------------
 
+
 @router.get("/{project_slug}/content/{content_id}")
 async def get_content(
     project_slug: str,
@@ -69,6 +70,7 @@ async def get_content(
     if _is_wombat_id(content_id):
         # Resolve wombat_id — kind is unknown so search across all kinds.
         from sqlalchemy import and_, select
+
         from wombat_api.database.models import Content
 
         q = select(Content).where(
@@ -82,8 +84,8 @@ async def get_content(
     else:
         try:
             uid = uuid.UUID(content_id)
-        except ValueError:
-            raise HTTPException(422, f"Invalid content_id: must be a UUID or WombatID, got {content_id!r}")
+        except ValueError as exc:
+            raise HTTPException(422, f"Invalid content_id: must be a UUID or WombatID, got {content_id!r}") from exc
         row = await repo.get_content_by_id(uid)
         if row is not None and row.project_id != project.id:
             row = None  # security: hide content from other projects
@@ -96,6 +98,7 @@ async def get_content(
 # ---------------------------------------------------------------------------
 # GET /content/{content_id}/related
 # ---------------------------------------------------------------------------
+
 
 @router.get("/{project_slug}/content/{content_id}/related")
 async def get_related_content(
@@ -120,6 +123,7 @@ async def get_related_content(
     # Resolve the source row
     if _is_wombat_id(content_id):
         from sqlalchemy import and_, select
+
         from wombat_api.database.models import Content
 
         q = select(Content).where(
@@ -133,8 +137,8 @@ async def get_related_content(
     else:
         try:
             uid = uuid.UUID(content_id)
-        except ValueError:
-            raise HTTPException(422, f"Invalid content_id: {content_id!r}")
+        except ValueError as exc:
+            raise HTTPException(422, f"Invalid content_id: {content_id!r}") from exc
         row = await repo.get_content_by_id(uid)
         if row is not None and row.project_id != project.id:
             row = None

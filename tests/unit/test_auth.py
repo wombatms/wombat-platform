@@ -14,7 +14,7 @@ Covers:
 import hashlib
 import secrets
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import jwt as pyjwt
@@ -58,7 +58,7 @@ class TestJWT:
     def test_expired_token_raises(self):
         uid = uuid.uuid4()
         token = create_access_token(uid, "test@example.com", expires_minutes=-1)
-        with pytest.raises(Exception):  # ExpiredSignatureError
+        with pytest.raises(Exception):  # noqa: B017 -- ExpiredSignatureError; exact type varies by jwt lib version
             decode_token(token)
 
     # -----------------------------------------------------------------------
@@ -99,7 +99,7 @@ class TestJWT:
         must not silently succeed with an unexpected token_type value.
         """
         cfg = get_config()
-        exp = datetime.now(timezone.utc) + timedelta(minutes=15)
+        exp = datetime.now(UTC) + timedelta(minutes=15)
         # Manually encode a JWT with only sub and exp, no token_type
         minimal_payload = {"sub": str(uuid.uuid4()), "exp": exp}
         raw_token = pyjwt.encode(minimal_payload, cfg.jwt_secret, algorithm="HS256")
@@ -163,11 +163,12 @@ class TestAPITokenExpiry:
     async def test_expired_api_token_raises_http_401(self):
         """An APITokenDB row with expires_at in the past must be rejected."""
         from fastapi import HTTPException
+
         from wombat_api.auth.dependencies import get_current_user
 
         # Build a fake token row with expired timestamp
         expired_row = MagicMock()
-        expired_row.expires_at = datetime.now(timezone.utc) - timedelta(days=1)
+        expired_row.expires_at = datetime.now(UTC) - timedelta(days=1)
         expired_row.user_id = uuid.uuid4()
 
         # Build a fake repo that returns the expired row
@@ -178,14 +179,14 @@ class TestAPITokenExpiry:
         mock_session = AsyncMock()
 
         # Patch Repository so get_current_user uses our mock
-        import wombat_api.auth.dependencies as _dep_mod
         from unittest.mock import patch
+
+        import wombat_api.auth.dependencies as _dep_mod
 
         raw_token = "wombat_" + secrets.token_urlsafe(32)
 
-        with patch.object(_dep_mod, "Repository", return_value=mock_repo):
-            with pytest.raises(HTTPException) as exc_info:
-                await get_current_user(token=raw_token, session=mock_session)
+        with patch.object(_dep_mod, "Repository", return_value=mock_repo), pytest.raises(HTTPException) as exc_info:
+            await get_current_user(token=raw_token, session=mock_session)
 
         assert exc_info.value.status_code == 401
 
@@ -194,12 +195,11 @@ class TestAPITokenExpiry:
         """An APITokenDB row with expires_at in the future must NOT be rejected
         on the expiry branch.
         """
-        from fastapi import HTTPException
         from wombat_api.auth.dependencies import get_current_user
 
         # Build a fake token row that expires in the future
         valid_row = MagicMock()
-        valid_row.expires_at = datetime.now(timezone.utc) + timedelta(days=30)
+        valid_row.expires_at = datetime.now(UTC) + timedelta(days=30)
         valid_row.user_id = uuid.uuid4()
 
         # Fake user returned by session.get
@@ -212,8 +212,9 @@ class TestAPITokenExpiry:
         mock_session = AsyncMock()
         mock_session.get = AsyncMock(return_value=fake_user)
 
-        import wombat_api.auth.dependencies as _dep_mod
         from unittest.mock import patch
+
+        import wombat_api.auth.dependencies as _dep_mod
 
         raw_token = "wombat_" + secrets.token_urlsafe(32)
 

@@ -4,8 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import yaml
+
+if TYPE_CHECKING:
+    from wombat_core.config.models import RagSourcesConfig
 
 
 @dataclass
@@ -46,7 +50,7 @@ class WombatConfig:
     id: IDConfig = field(default_factory=IDConfig)
     config_path: Path | None = None
     # rag.sources section — parsed into RagSourcesConfig; None if not present.
-    rag_sources: "RagSourcesConfig | None" = None
+    rag_sources: RagSourcesConfig | None = None
 
 
 def _find_config_dir(start: Path) -> Path | None:
@@ -83,10 +87,9 @@ def load_config(start_path: Path) -> WombatConfig:
     rag_sources = None
     if rag_sources_raw is not None:
         from wombat_core.config.models import AppRepoSource, RagSourcesConfig
+
         rag_sources = RagSourcesConfig(
-            app_repos=[
-                AppRepoSource(**src) for src in rag_sources_raw.get("app_repos", [])
-            ],
+            app_repos=[AppRepoSource(**src) for src in rag_sources_raw.get("app_repos", [])],
             docs_folder=rag_sources_raw.get("docs_folder"),
             chunk_size_tokens=rag_sources_raw.get("chunk_size_tokens", 500),
             chunk_overlap_tokens=rag_sources_raw.get("chunk_overlap_tokens", 50),

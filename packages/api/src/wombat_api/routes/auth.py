@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import secrets
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
@@ -18,7 +18,6 @@ from wombat_api.auth.jwt import (
     decode_token,
 )
 from wombat_api.auth.passwords import hash_password, verify_password
-from wombat_api.config import get_config
 from wombat_api.database.engine import get_session
 from wombat_api.database.models import APITokenDB, UserDB
 from wombat_api.database.repository import Repository
@@ -54,16 +53,12 @@ async def register(
     repo = Repository(session)
 
     # Count existing users to decide whether bootstrap is allowed.
-    user_count: int = (
-        await session.execute(select(func.count()).select_from(UserDB))
-    ).scalar_one()
+    user_count: int = (await session.execute(select(func.count()).select_from(UserDB))).scalar_one()
 
     if user_count > 0:
         # Non-bootstrap: require a caller token and admin role on some project.
         # We re-use get_current_user manually here because this endpoint is
         # otherwise unauthenticated during bootstrap.
-        from wombat_api.auth.dependencies import oauth2_scheme
-        from fastapi.security.utils import get_authorization_scheme_param
         # The caller must pass Authorization: Bearer <token>.
         # We can't use Depends() conditionally at runtime, so we raise
         # HTTP 401 with a hint if no token is provided.
@@ -83,9 +78,7 @@ async def register(
         raise HTTPException(status_code=409, detail="Email already registered")
 
     hashed_pw = hash_password(body.password)
-    user_create = UserCreate(
-        email=body.email, password=body.password, display_name=body.display_name
-    )
+    user_create = UserCreate(email=body.email, password=body.password, display_name=body.display_name)
     user = await repo.create_user(user_create, hashed_pw)
     await session.commit()
     return user
@@ -104,7 +97,6 @@ async def login(
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is inactive")
 
-    cfg = get_config()
     access = create_access_token(user.id, user.email)
     refresh = create_refresh_token(user.id)
     return TokenResponse(access_token=access, refresh_token=refresh)
@@ -118,8 +110,8 @@ async def refresh(
     """Exchange a refresh token for a new access + refresh token pair."""
     try:
         payload = decode_token(body.refresh_token)
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token") from exc
 
     if payload.token_type != "refresh":
         raise HTTPException(status_code=401, detail="Expected refresh token")
@@ -162,7 +154,7 @@ async def create_api_token(
 
     expires_at: datetime | None = None
     if body.expires_in_days is not None:
-        expires_at = datetime.now(timezone.utc) + timedelta(days=body.expires_in_days)
+        expires_at = datetime.now(UTC) + timedelta(days=body.expires_in_days)
 
     token_row = await repo.create_api_token(
         user_id=user.id,
@@ -204,7 +196,6 @@ async def delete_api_token(
     Returns 204 on success, 404 if the token does not exist or is not owned
     by the caller.
     """
-    from sqlalchemy import select as sa_select
 
     token_row = await session.get(APITokenDB, token_id)
     if token_row is None or token_row.user_id != user.id:

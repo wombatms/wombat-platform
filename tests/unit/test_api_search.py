@@ -15,10 +15,10 @@ import uuid
 
 import pytest
 import pytest_asyncio
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from wombat_api.database.models import Content, EMBED_DIM
-from wombat_api.search.hybrid import hybrid_search, _cosine
+from wombat_api.database.models import EMBED_DIM, Content
+from wombat_api.search.hybrid import _cosine, hybrid_search
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -41,6 +41,7 @@ async def sqlite_session():
 def _make_embedding(seed: float) -> list[float]:
     """Return a unit-normalised EMBED_DIM vector seeded by seed."""
     import math
+
     vec = [math.sin(seed + i * 0.1) for i in range(EMBED_DIM)]
     mag = sum(x * x for x in vec) ** 0.5
     return [x / mag for x in vec]
@@ -136,7 +137,11 @@ async def test_semantic_search_top_k_limits_results(sqlite_session):
     q_vec = _make_embedding(0.0)
     for i in range(5):
         await _insert_content(
-            sqlite_session, project_id, f"TC-{i:03d}", f"Case {i}", "testcase",
+            sqlite_session,
+            project_id,
+            f"TC-{i:03d}",
+            f"Case {i}",
+            "testcase",
             _make_embedding(float(i) * 0.5),
         )
     await sqlite_session.commit()
@@ -283,24 +288,39 @@ async def test_postgres_hybrid_search():
     Requires WOMBAT_TEST_DATABASE_URL=postgresql+asyncpg://...
     and the schema already migrated (head).
     """
-    engine = create_async_engine(_PG_URL)
-    async with async_sessionmaker(engine)() as session:
-        project_id = uuid.uuid4()
-        # Insert a testcase with a real embedding.
-        q_vec = _make_embedding(0.5)
-        emb = _make_embedding(0.5)
-        await _insert_content(session, project_id, "TC-PG-001", "Postgres test", "testcase", emb)
-        await session.commit()
+    from sqlalchemy.pool import NullPool
 
-        hits = await hybrid_search(
-            session,
-            project_id=project_id,
-            query="postgres test",
-            query_embedding=q_vec,
-            mode="hybrid",
-            top_k=5,
-        )
-        assert len(hits) >= 1
-        assert hits[0]["wombat_id"] == "TC-PG-001"
+    from wombat_api.database.models import ProjectDB
 
-    await engine.dispose()
+    engine = create_async_engine(_PG_URL, poolclass=NullPool)
+    try:
+        async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+            # Must create a project row first — Postgres enforces FK constraints.
+            project_id = uuid.uuid4()
+            project = ProjectDB(
+                id=project_id,
+                slug=f"pg-search-test-{project_id.hex[:8]}",
+                name="PG Search Test",
+                org="test",
+            )
+            session.add(project)
+            await session.flush()
+
+            # Insert a testcase with a real embedding.
+            q_vec = _make_embedding(0.5)
+            emb = _make_embedding(0.5)
+            await _insert_content(session, project_id, "TC-PG-001", "Postgres test", "testcase", emb)
+            await session.commit()
+
+            hits = await hybrid_search(
+                session,
+                project_id=project_id,
+                query="postgres test",
+                query_embedding=q_vec,
+                mode="hybrid",
+                top_k=5,
+            )
+            assert len(hits) >= 1
+            assert hits[0]["wombat_id"] == "TC-PG-001"
+    finally:
+        await engine.dispose()

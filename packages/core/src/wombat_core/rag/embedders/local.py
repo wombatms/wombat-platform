@@ -21,9 +21,10 @@ class LocalEmbedder:
         if self.dim is None:
             self.dim = self._probe_dim()
 
-    @lru_cache(maxsize=1)
+    @lru_cache(maxsize=1)  # noqa: B019 -- intentional per-instance cache; LocalEmbedder is a singleton
     def _get_model(self):
         from sentence_transformers import SentenceTransformer
+
         return SentenceTransformer(self._model_name)
 
     def _probe_dim(self) -> int:
@@ -31,8 +32,7 @@ class LocalEmbedder:
 
     async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         import asyncio
+
         model = self._get_model()
         # sentence-transformers is synchronous; offload to a thread.
-        return await asyncio.to_thread(
-            lambda: model.encode(texts, normalize_embeddings=True).tolist()
-        )
+        return await asyncio.to_thread(lambda: model.encode(texts, normalize_embeddings=True).tolist())

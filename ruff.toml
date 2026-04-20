@@ -1,8 +1,17 @@
 target-version = "py312"
-line-length = 100
+line-length = 120
 
 [lint]
 select = ["E", "F", "I", "N", "W", "UP", "B", "A", "SIM"]
+# B008: FastAPI uses Depends()/Query()/File() in argument defaults by design;
+# suppressed project-wide to avoid false positives on all route signatures.
+ignore = ["B008"]
 
 [lint.isort]
-known-first-party = ["wombat_core", "wombat_cli"]
+known-first-party = ["wombat_core", "wombat_cli", "wombat_api", "wombat_mcp"]
+
+[lint.per-file-ignores]
+# Migration files: imports structured for Alembic conventions.
+"migrations/*" = ["E402", "I001"]
+# Test files: unused variable assignments and long assertion lines are common pytest patterns.
+"tests/*" = ["F841", "E501"]

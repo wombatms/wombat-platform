@@ -20,10 +20,7 @@ def create_command(
         str | None,
         typer.Option(
             "--id",
-            help=(
-                "Explicit entity ID. Auto-sequenced if omitted "
-                "and id.auto_sequence=true."
-            ),
+            help=("Explicit entity ID. Auto-sequenced if omitted and id.auto_sequence=true."),
         ),
     ] = None,
     title: Annotated[
@@ -37,7 +34,8 @@ def create_command(
     output: Annotated[
         Path | None,
         typer.Option(
-            "--output", "-o",
+            "--output",
+            "-o",
             help="Write entity to this file. Defaults to .wombat/<type>/<id>.<ext>.",
         ),
     ] = None,
@@ -72,10 +70,7 @@ def create_command(
                 hint="Run `wombat init` first.",
             )
         else:
-            err_console.print(
-                "[red]Error:[/red] No .wombat/ directory found. "
-                "Run `wombat init` first."
-            )
+            err_console.print("[red]Error:[/red] No .wombat/ directory found. Run `wombat init` first.")
         raise typer.Exit(1)
 
     # Resolve ID
@@ -91,8 +86,7 @@ def create_command(
                 )
             else:
                 err_console.print(
-                    "[red]Error:[/red] No --id provided. "
-                    "Pass --id or enable id.auto_sequence in .wombat/config.yaml."
+                    "[red]Error:[/red] No --id provided. Pass --id or enable id.auto_sequence in .wombat/config.yaml."
                 )
             raise typer.Exit(1)
 
@@ -100,10 +94,7 @@ def create_command(
     entity_data: dict = {}
     if from_template is not None:
         suffix = from_template.suffix.lower()
-        if suffix == ".md":
-            result = parse_markdown_file(from_template)
-        else:
-            result = parse_yaml_file(from_template)
+        result = parse_markdown_file(from_template) if suffix == ".md" else parse_yaml_file(from_template)
         if not result.ok or result.entity is None:
             if json_output:
                 print_error(
@@ -111,9 +102,7 @@ def create_command(
                     f"Failed to parse template: {result.error}",
                 )
             else:
-                err_console.print(
-                    f"[red]Template error:[/red] {result.error}"
-                )
+                err_console.print(f"[red]Template error:[/red] {result.error}")
             raise typer.Exit(1)
         entity_data = result.entity.model_dump()
 
@@ -139,9 +128,11 @@ def create_command(
     if dry_run:
         if json_output:
             from wombat_cli.formatting import entity_to_dict
+
             print_json({"entity": entity_to_dict(entity), "dry_run": True})
         else:
             from wombat_cli.formatting.table_output import console
+
             console.print("[dim](dry-run — not written)[/dim]")
             console.print(content)
         sys.exit(0)
@@ -156,16 +147,18 @@ def create_command(
         write_entity(entity, output)
         if json_output:
             from wombat_cli.formatting import entity_to_dict
-            print_json({
-                "entity": entity_to_dict(entity),
-                "path": str(output),
-                "written": True,
-            })
+
+            print_json(
+                {
+                    "entity": entity_to_dict(entity),
+                    "path": str(output),
+                    "written": True,
+                }
+            )
         else:
             from wombat_cli.formatting.table_output import console
-            console.print(
-                f"[green]Created[/green] [bold]{entity_id}[/bold] → {output}"
-            )
+
+            console.print(f"[green]Created[/green] [bold]{entity_id}[/bold] → {output}")
     else:
         print(content)
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from typing import Annotated
 
@@ -103,10 +102,10 @@ def _api_sync(
             r.raise_for_status()
     except httpx.HTTPStatusError as exc:
         typer.echo(f"Error: HTTP {exc.response.status_code} — {exc.response.text}", err=True)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
     except httpx.RequestError as exc:
         typer.echo(f"Error: request failed — {exc}", err=True)
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     data = r.json()
     typer.echo(
@@ -123,7 +122,7 @@ def _local_smoke(test_repo_path: Path, rag) -> None:
     Full local-mode DB writes are deferred.  This is useful for checking that
     paths resolve correctly before pushing to a server.
     """
-    from wombat_core.config.models import AppRepoSource, RagSourcesConfig
+    from wombat_core.config.models import RagSourcesConfig
     from wombat_core.rag.sources import SourceResolver
 
     app_repos = []
@@ -152,6 +151,5 @@ def _local_smoke(test_repo_path: Path, rag) -> None:
     for rf in files:
         typer.echo(f"  {rf.source_repo}:{rf.source_path}")
     typer.echo(
-        "\nNote: local mode is a smoke-test only (no DB writes). "
-        "Use --server to sync against a running Wombat API."
+        "\nNote: local mode is a smoke-test only (no DB writes). Use --server to sync against a running Wombat API."
     )

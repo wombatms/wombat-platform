@@ -16,12 +16,16 @@ logger = logging.getLogger(__name__)
 def create_app() -> FastAPI:
     cfg = get_config()
     app = FastAPI(
-        title="Wombat API", version="0.1.0",
+        title="Wombat API",
+        version="0.1.0",
         description="Agent-friendly test case management API",
     )
     app.add_middleware(
-        CORSMiddleware, allow_origins=cfg.cors_origins,
-        allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
+        CORSMiddleware,
+        allow_origins=cfg.cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
     _assert_embedder_dim_matches()
     _register_routes(app)
@@ -59,9 +63,21 @@ def _assert_embedder_dim_matches() -> None:
 
 def _register_routes(app: FastAPI) -> None:
     from wombat_api.routes import (  # noqa: F401
-        auth, projects, testcases, shared_steps, plans, stories, suites,
-        runs, sync, imports, audit, search, content,
+        audit,
+        auth,
+        content,
+        imports,
+        plans,
+        projects,
+        runs,
+        search,
+        shared_steps,
+        stories,
+        suites,
+        sync,
+        testcases,
     )
+
     app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
     app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
     app.include_router(search.router, prefix="/api/projects", tags=["search"])
@@ -118,12 +134,10 @@ def _register_error_handlers(app: FastAPI) -> None:
     from fastapi.exceptions import RequestValidationError
 
     @app.exception_handler(RequestValidationError)
-    async def validation_exception_handler(
-        request: Request, exc: RequestValidationError
-    ) -> JSONResponse:
+    async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
         errors = exc.errors()
         first = errors[0] if errors else {}
-        field = ".".join(str(l) for l in first.get("loc", [])) or None
+        field = ".".join(str(loc) for loc in first.get("loc", [])) or None
         return JSONResponse(
             status_code=422,
             content={

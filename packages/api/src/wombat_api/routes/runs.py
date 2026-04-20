@@ -35,6 +35,7 @@ router = APIRouter()
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _run_out(r) -> dict:
     return {
         "id": str(r.id),
@@ -53,7 +54,8 @@ def _run_out(r) -> dict:
 
 
 async def _resolve_content_id(
-    repo: Repository, project_id: uuid.UUID,
+    repo: Repository,
+    project_id: uuid.UUID,
 ):
     """Return a closure that resolves wombat_id → content.id."""
 
@@ -68,6 +70,7 @@ async def _resolve_content_id(
 # Create run
 # ---------------------------------------------------------------------------
 
+
 @router.post("/{project_slug}/runs", status_code=201)
 async def create_run(
     project_slug: str,
@@ -75,13 +78,14 @@ async def create_run(
     project: ProjectDB = Depends(require_role(Role.editor)),
     session: AsyncSession = Depends(get_session),
 ):
-    from wombat_api.auth.dependencies import get_current_user
     # We need the user identity for triggered_by; retrieve it via the session.
     # require_role already authenticated the user; re-use the dependency inline.
     # For simplicity, use a sentinel when the identity is unavailable.
     repo = Repository(session)
     run = await repo.create_run(
-        project_id=project.id, run=body, triggered_by="api",
+        project_id=project.id,
+        run=body,
+        triggered_by="api",
     )
     await session.commit()
     return {"data": _run_out(run)}
@@ -90,6 +94,7 @@ async def create_run(
 # ---------------------------------------------------------------------------
 # List runs
 # ---------------------------------------------------------------------------
+
 
 @router.get("/{project_slug}/runs")
 async def list_runs(
@@ -104,7 +109,8 @@ async def list_runs(
     return {
         "data": [_run_out(r) for r in runs],
         "pagination": {
-            "limit": limit, "offset": offset,
+            "limit": limit,
+            "offset": offset,
             "has_more": len(runs) == limit,
         },
     }
@@ -114,9 +120,11 @@ async def list_runs(
 # Get run + summary
 # ---------------------------------------------------------------------------
 
+
 @router.get("/{project_slug}/runs/{run_id}")
 async def get_run(
-    project_slug: str, run_id: uuid.UUID,
+    project_slug: str,
+    run_id: uuid.UUID,
     project: ProjectDB = Depends(require_role(Role.viewer)),
     session: AsyncSession = Depends(get_session),
 ):
@@ -137,9 +145,11 @@ async def get_run(
 # Update run status
 # ---------------------------------------------------------------------------
 
+
 @router.patch("/{project_slug}/runs/{run_id}")
 async def update_run(
-    project_slug: str, run_id: uuid.UUID,
+    project_slug: str,
+    run_id: uuid.UUID,
     body: Annotated[dict, Body()],
     project: ProjectDB = Depends(require_role(Role.editor)),
     session: AsyncSession = Depends(get_session),
@@ -162,9 +172,11 @@ async def update_run(
 # Single result
 # ---------------------------------------------------------------------------
 
+
 @router.post("/{project_slug}/runs/{run_id}/results", status_code=201)
 async def add_result(
-    project_slug: str, run_id: uuid.UUID,
+    project_slug: str,
+    run_id: uuid.UUID,
     body: ExecutionResultCreate,
     project: ProjectDB = Depends(require_role(Role.editor)),
     session: AsyncSession = Depends(get_session),
@@ -185,9 +197,11 @@ async def add_result(
 # Bulk results (JSON array)
 # ---------------------------------------------------------------------------
 
+
 @router.post("/{project_slug}/runs/{run_id}/results:bulk", status_code=201)
 async def bulk_results(
-    project_slug: str, run_id: uuid.UUID,
+    project_slug: str,
+    run_id: uuid.UUID,
     body: list[ExecutionResultCreate],
     project: ProjectDB = Depends(require_role(Role.editor)),
     session: AsyncSession = Depends(get_session),
@@ -206,9 +220,11 @@ async def bulk_results(
 # JSONL streaming ingest
 # ---------------------------------------------------------------------------
 
+
 @router.post("/{project_slug}/runs/{run_id}/ingest", status_code=201)
 async def ingest_jsonl(
-    project_slug: str, run_id: uuid.UUID,
+    project_slug: str,
+    run_id: uuid.UUID,
     request: Request,
     project: ProjectDB = Depends(require_role(Role.editor)),
     session: AsyncSession = Depends(get_session),
@@ -226,7 +242,7 @@ async def ingest_jsonl(
         raise HTTPException(404, "Run not found")
 
     raw = await request.body()
-    lines = [l.strip() for l in raw.decode("utf-8").splitlines() if l.strip()]
+    lines = [line.strip() for line in raw.decode("utf-8").splitlines() if line.strip()]
     results: list[ExecutionResultCreate] = []
     errors: list[dict] = []
     for i, line in enumerate(lines):

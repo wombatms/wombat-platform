@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
@@ -36,9 +36,8 @@ async def get_current_user(
         token_row = await repo.get_token_by_hash(token_hash)
         if token_row is None:
             raise HTTPException(status_code=401, detail="Invalid API token")
-        if token_row.expires_at is not None:
-            if datetime.now(timezone.utc) >= token_row.expires_at:
-                raise HTTPException(status_code=401, detail="API token expired")
+        if token_row.expires_at is not None and datetime.now(UTC) >= token_row.expires_at:
+            raise HTTPException(status_code=401, detail="API token expired")
         user = await session.get(UserDB, token_row.user_id)
         if user is None:
             raise HTTPException(status_code=401, detail="User not found")
@@ -47,8 +46,8 @@ async def get_current_user(
         # JWT path
         try:
             payload = decode_token(token)
-        except Exception:
-            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        except Exception as exc:
+            raise HTTPException(status_code=401, detail="Invalid or expired token") from exc
         if payload.token_type != "access":
             raise HTTPException(status_code=401, detail="Expected access token")
         user = await session.get(UserDB, payload.user_id)

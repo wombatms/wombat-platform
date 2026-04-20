@@ -25,10 +25,10 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
 # ---------------------------------------------------------------------------
 # FakeEmbedder — no sentence-transformers needed
 # ---------------------------------------------------------------------------
+
 
 class _FakeEmbedder:
     name = "fake"
@@ -36,6 +36,7 @@ class _FakeEmbedder:
 
     async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         from wombat_api.database.models import EMBED_DIM
+
         return [[float(i % 256) / 256.0] + [0.0] * (EMBED_DIM - 1) for i, _ in enumerate(texts)]
 
 
@@ -49,6 +50,7 @@ INTEGRATION_REPO = Path(__file__).parent.parent.parent / "fixtures" / "integrati
 async def _seed_project(db_session: AsyncSession, async_engine) -> tuple:
     """Create a project and seed it via the Indexer. Returns (project, slug)."""
     from sqlalchemy.ext.asyncio import async_sessionmaker
+
     from wombat_api.database.models import ProjectDB
     from wombat_api.database.repository import Repository
     from wombat_api.sync.indexer import Indexer
@@ -92,6 +94,7 @@ async def _seed_project(db_session: AsyncSession, async_engine) -> tuple:
 # Tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_list_testcases_returns_both(
     httpx_client: AsyncClient,
@@ -104,6 +107,7 @@ async def test_list_testcases_returns_both(
     project, slug = await _seed_project(db_session, async_engine)
     # Give the viewer user access to this project
     from wombat_api.database.models import UserProjectRoleDB
+
     viewer_user = users["viewer"]["user"]
     role = UserProjectRoleDB(user_id=viewer_user.id, project_id=project.id, role="viewer")
     db_session.add(role)
@@ -134,6 +138,7 @@ async def test_list_plans_returns_one(
     """GET /{slug}/plans returns 1 plan."""
     project, slug = await _seed_project(db_session, async_engine)
     from wombat_api.database.models import UserProjectRoleDB
+
     viewer_user = users["viewer"]["user"]
     role = UserProjectRoleDB(user_id=viewer_user.id, project_id=project.id, role="viewer")
     db_session.add(role)
@@ -150,17 +155,6 @@ async def test_list_plans_returns_one(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason=(
-        "Tag filter uses Content.tags.contains([t]) which SQLAlchemy JSON type "
-        "compiles to LIKE on Postgres, but the tags column is JSONB (from Alembic "
-        "migration). JSONB does not support the ~~ (LIKE) operator. Fix: change "
-        "mapped_column(JSON) to mapped_column(JSONB) in the Content model "
-        "so SQLAlchemy generates the @> containment operator. "
-        "Tracked as a production model/migration mismatch."
-    ),
-    strict=False,
-)
 async def test_tag_filter_auth(
     httpx_client: AsyncClient,
     db_session: AsyncSession,
@@ -170,12 +164,12 @@ async def test_tag_filter_auth(
 ):
     """?tag=auth returns only rows tagged with 'auth'.
 
-    NOTE: This test is xfail due to a JSON vs JSONB type mismatch in the
-    Content model. When fixed (Content.tags should use JSONB), this test
-    should pass and strict=True should be restored.
+    Content.tags is declared JSONB so SQLAlchemy compiles .contains([t]) to
+    the @> operator — no LIKE mismatch.
     """
     project, slug = await _seed_project(db_session, async_engine)
     from wombat_api.database.models import UserProjectRoleDB
+
     viewer_user = users["viewer"]["user"]
     role = UserProjectRoleDB(user_id=viewer_user.id, project_id=project.id, role="viewer")
     db_session.add(role)
@@ -204,6 +198,7 @@ async def test_get_specific_testcase(
     """GET /{slug}/testcases/{wombat_id} returns the specific testcase."""
     project, slug = await _seed_project(db_session, async_engine)
     from wombat_api.database.models import UserProjectRoleDB
+
     viewer_user = users["viewer"]["user"]
     role = UserProjectRoleDB(user_id=viewer_user.id, project_id=project.id, role="viewer")
     db_session.add(role)
@@ -230,6 +225,7 @@ async def test_get_unknown_wombat_id_returns_404(
     """GET /{slug}/testcases/DOES-NOT-EXIST → 404."""
     project, slug = await _seed_project(db_session, async_engine)
     from wombat_api.database.models import UserProjectRoleDB
+
     viewer_user = users["viewer"]["user"]
     role = UserProjectRoleDB(user_id=viewer_user.id, project_id=project.id, role="viewer")
     db_session.add(role)
@@ -254,6 +250,7 @@ async def test_cross_project_access_is_denied(
     # Project A — viewer user has role
     project_a, slug_a = await _seed_project(db_session, async_engine)
     from wombat_api.database.models import UserProjectRoleDB
+
     viewer_user = users["viewer"]["user"]
     role_a = UserProjectRoleDB(user_id=viewer_user.id, project_id=project_a.id, role="viewer")
     db_session.add(role_a)

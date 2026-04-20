@@ -17,19 +17,22 @@ Design
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
 
 from wombat_core.importing.mapping import MappingProfile
 from wombat_core.models.testcase import TestCase
 
+if TYPE_CHECKING:
+    from wombat_core.importing import ImportResult
+
 
 def transform_rows(
     headers: list[str],
     rows: list[list],
     profile: MappingProfile,
-) -> "wombat_core.importing.ImportResult":  # type: ignore[name-defined]  # lazy import
+) -> ImportResult:
     from wombat_core.importing import ImportResult
 
     col_index = profile.build_index(headers)
@@ -45,10 +48,12 @@ def transform_rows(
             entities.append(tc)
         except Exception as exc:
             skipped.append(row_idx)
-            errors.append({
-                "row": row_idx,
-                "message": str(exc),
-            })
+            errors.append(
+                {
+                    "row": row_idx,
+                    "message": str(exc),
+                }
+            )
 
     return ImportResult(entities=entities, skipped=skipped, errors=errors)
 
