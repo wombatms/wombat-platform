@@ -171,6 +171,20 @@ class Repository:
     async def get_content_by_id(self, content_id: uuid.UUID) -> Content | None:
         return await self.session.get(Content, content_id)
 
+    async def get_content_by_path(
+        self, project_id: uuid.UUID, source_repo: str, source_path: str,
+    ) -> Content | None:
+        """Look up a content row by its source location (used for docs without wombat_id)."""
+        q = select(Content).where(
+            and_(
+                Content.project_id == project_id,
+                Content.source_repo == source_repo,
+                Content.source_path == source_path,
+                Content.deleted_at.is_(None),
+            )
+        )
+        return (await self.session.execute(q)).scalar_one_or_none()
+
     async def list_content(
         self,
         project_id: uuid.UUID,
