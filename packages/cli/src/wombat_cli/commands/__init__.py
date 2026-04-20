@@ -11,6 +11,9 @@ from wombat_cli.commands.search import search_command
 from wombat_cli.commands.show import show_command
 from wombat_cli.commands.update import update_command
 from wombat_cli.commands.validate import validate_command
+from wombat_cli.commands.sync import sync_command
+from wombat_cli.commands.import_cmd import import_command
+from wombat_cli.commands.rag import rag_app
 
 __all__ = [
     "config_command",
@@ -24,4 +27,7 @@ __all__ = [
     "show_command",
     "update_command",
     "validate_command",
+    "sync_command",
+    "import_command",
+    "rag_app",
 ]

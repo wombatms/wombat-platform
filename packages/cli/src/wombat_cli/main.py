@@ -9,11 +9,14 @@ from wombat_cli.commands import (
     create_command,
     diff_command,
     export_command,
+    import_command,
     init_command,
     lint_command,
     list_command,
+    rag_app,
     search_command,
     show_command,
+    sync_command,
     update_command,
     validate_command,
 )
@@ -60,6 +63,14 @@ app.command("diff", help="Show differences between entity versions.")(diff_comma
 
 app.command("export", help="Export entities to JSON, YAML, CSV, or Markdown.")(export_command)
 app.command("config", help="Read or write .wombat/config.yaml settings.")(config_command)
+
+# ---------------------------------------------------------------------------
+# Server-integration commands (SP2)
+# ---------------------------------------------------------------------------
+
+app.command("sync", help="Sync Git-canonical content into the Wombat DB and RAG index.")(sync_command)
+app.command("import", help="Import test cases from XLSX or CSV file.")(import_command)
+app.add_typer(rag_app, name="rag")
 
 
 if __name__ == "__main__":
