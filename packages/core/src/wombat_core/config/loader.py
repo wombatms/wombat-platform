@@ -45,6 +45,8 @@ class WombatConfig:
     templates: TemplatesConfig = field(default_factory=TemplatesConfig)
     id: IDConfig = field(default_factory=IDConfig)
     config_path: Path | None = None
+    # rag.sources section — parsed into RagSourcesConfig; None if not present.
+    rag_sources: "RagSourcesConfig | None" = None
 
 
 def _find_config_dir(start: Path) -> Path | None:
@@ -75,6 +77,21 @@ def load_config(start_path: Path) -> WombatConfig:
     templates_raw = raw.get("templates", {})
     id_raw = raw.get("id", {})
 
+    # Parse optional [rag.sources] section — backward compatible.
+    rag_raw = raw.get("rag", {})
+    rag_sources_raw = rag_raw.get("sources")
+    rag_sources = None
+    if rag_sources_raw is not None:
+        from wombat_core.config.models import AppRepoSource, RagSourcesConfig
+        rag_sources = RagSourcesConfig(
+            app_repos=[
+                AppRepoSource(**src) for src in rag_sources_raw.get("app_repos", [])
+            ],
+            docs_folder=rag_sources_raw.get("docs_folder"),
+            chunk_size_tokens=rag_sources_raw.get("chunk_size_tokens", 500),
+            chunk_overlap_tokens=rag_sources_raw.get("chunk_overlap_tokens", 50),
+        )
+
     return WombatConfig(
         project=ProjectConfig(
             id=project_raw.get("id", ""),
@@ -90,4 +107,5 @@ def load_config(start_path: Path) -> WombatConfig:
         templates=TemplatesConfig(directory=templates_raw.get("directory", "templates/")),
         id=IDConfig(auto_sequence=id_raw.get("auto_sequence", False)),
         config_path=config_file,
+        rag_sources=rag_sources,
     )
