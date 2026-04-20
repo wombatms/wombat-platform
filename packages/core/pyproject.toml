@@ -1,0 +1,23 @@
+[project]
+name = "wombat-core"
+version = "0.1.0"
+description = "Core domain models, parsing, validation, and linting for Wombat"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.0,<3.0",
+    "python-frontmatter>=1.1.0",
+    "pyyaml>=6.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/wombat_core"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+]

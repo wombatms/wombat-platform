@@ -1,0 +1,112 @@
+{
+  "$defs": {
+    "IncludeExclude": {
+      "properties": {
+        "tags_any": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags Any",
+          "type": "array"
+        },
+        "tags_all": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags All",
+          "type": "array"
+        },
+        "components_any": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Components Any",
+          "type": "array"
+        },
+        "priorities": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Priority"
+          },
+          "title": "Priorities",
+          "type": "array"
+        }
+      },
+      "title": "IncludeExclude",
+      "type": "object"
+    },
+    "Priority": {
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low"
+      ],
+      "title": "Priority",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "id": {
+      "pattern": "^(TC|SS|PLAN|STORY|SUITE)-[A-Z0-9][-A-Z0-9]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Description"
+    },
+    "cases": {
+      "default": [],
+      "items": {
+        "pattern": "^(TC|SS|PLAN|STORY|SUITE)-[A-Z0-9][-A-Z0-9]*$",
+        "type": "string"
+      },
+      "title": "Cases",
+      "type": "array"
+    },
+    "include": {
+      "$ref": "#/$defs/IncludeExclude",
+      "default": {
+        "tags_any": [],
+        "tags_all": [],
+        "components_any": [],
+        "priorities": []
+      }
+    },
+    "owner": {
+      "title": "Owner",
+      "type": "string"
+    },
+    "tags": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "owner"
+  ],
+  "title": "Suite",
+  "type": "object"
+}

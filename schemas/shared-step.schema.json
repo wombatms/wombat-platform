@@ -1,0 +1,90 @@
+{
+  "$defs": {
+    "Step": {
+      "properties": {
+        "number": {
+          "title": "Number",
+          "type": "integer"
+        },
+        "action": {
+          "title": "Action",
+          "type": "string"
+        },
+        "expected": {
+          "title": "Expected",
+          "type": "string"
+        }
+      },
+      "required": [
+        "number",
+        "action",
+        "expected"
+      ],
+      "title": "Step",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "id": {
+      "pattern": "^(TC|SS|PLAN|STORY|SUITE)-[A-Z0-9][-A-Z0-9]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "steps": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Step"
+      },
+      "title": "Steps",
+      "type": "array"
+    },
+    "variables": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Variables",
+      "type": "array"
+    },
+    "owner": {
+      "title": "Owner",
+      "type": "string"
+    },
+    "tags": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+    },
+    "version": {
+      "default": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "body": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Body"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "owner"
+  ],
+  "title": "SharedStep",
+  "type": "object"
+}

@@ -1,0 +1,115 @@
+{
+  "$defs": {
+    "CoverageState": {
+      "enum": [
+        "uncovered",
+        "partial",
+        "covered"
+      ],
+      "title": "CoverageState",
+      "type": "string"
+    },
+    "RiskLevel": {
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low"
+      ],
+      "title": "RiskLevel",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "id": {
+      "pattern": "^(TC|SS|PLAN|STORY|SUITE)-[A-Z0-9][-A-Z0-9]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Description"
+    },
+    "coverage": {
+      "$ref": "#/$defs/CoverageState",
+      "default": "uncovered"
+    },
+    "linked_tests": {
+      "default": [],
+      "items": {
+        "pattern": "^(TC|SS|PLAN|STORY|SUITE)-[A-Z0-9][-A-Z0-9]*$",
+        "type": "string"
+      },
+      "title": "Linked Tests",
+      "type": "array"
+    },
+    "linked_code": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Linked Code",
+      "type": "array"
+    },
+    "linked_docs": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Linked Docs",
+      "type": "array"
+    },
+    "risk": {
+      "$ref": "#/$defs/RiskLevel",
+      "default": "medium"
+    },
+    "owner": {
+      "title": "Owner",
+      "type": "string"
+    },
+    "tags": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+    },
+    "version": {
+      "default": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "body": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Body"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "owner"
+  ],
+  "title": "Story",
+  "type": "object"
+}

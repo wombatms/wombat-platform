@@ -1,0 +1,23 @@
+[project]
+name = "wombat-platform"
+version = "0.1.0"
+description = "Agent-friendly test case management platform"
+requires-python = ">=3.12"
+
+dependencies = [
+    "wombat-core",
+    "wombat-cli",
+]
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+wombat-core = { workspace = true }
+wombat-cli = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+]

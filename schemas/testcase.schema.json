@@ -1,0 +1,314 @@
+{
+  "$defs": {
+    "AutomationInfo": {
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/AutomationStatus",
+          "default": "manual"
+        },
+        "framework": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Framework"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        }
+      },
+      "title": "AutomationInfo",
+      "type": "object"
+    },
+    "AutomationStatus": {
+      "enum": [
+        "manual",
+        "candidate",
+        "in_progress",
+        "automated",
+        "not_automatable"
+      ],
+      "title": "AutomationStatus",
+      "type": "string"
+    },
+    "Priority": {
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low"
+      ],
+      "title": "Priority",
+      "type": "string"
+    },
+    "ReviewInfo": {
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/ReviewState",
+          "default": "draft"
+        },
+        "reviewers": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Reviewers",
+          "type": "array"
+        }
+      },
+      "title": "ReviewInfo",
+      "type": "object"
+    },
+    "ReviewState": {
+      "enum": [
+        "draft",
+        "in_review",
+        "approved",
+        "rejected",
+        "changes_requested"
+      ],
+      "title": "ReviewState",
+      "type": "string"
+    },
+    "Step": {
+      "properties": {
+        "number": {
+          "title": "Number",
+          "type": "integer"
+        },
+        "action": {
+          "title": "Action",
+          "type": "string"
+        },
+        "expected": {
+          "title": "Expected",
+          "type": "string"
+        }
+      },
+      "required": [
+        "number",
+        "action",
+        "expected"
+      ],
+      "title": "Step",
+      "type": "object"
+    },
+    "TestCaseStatus": {
+      "enum": [
+        "draft",
+        "active",
+        "deprecated",
+        "archived"
+      ],
+      "title": "TestCaseStatus",
+      "type": "string"
+    },
+    "TestType": {
+      "enum": [
+        "functional",
+        "regression",
+        "smoke",
+        "negative",
+        "accessibility",
+        "performance",
+        "security",
+        "compatibility",
+        "api",
+        "ui"
+      ],
+      "title": "TestType",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "id": {
+      "pattern": "^(TC|SS|PLAN|STORY|SUITE)-[A-Z0-9][-A-Z0-9]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "summary": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Summary"
+    },
+    "status": {
+      "$ref": "#/$defs/TestCaseStatus",
+      "default": "draft"
+    },
+    "priority": {
+      "$ref": "#/$defs/Priority",
+      "default": "medium"
+    },
+    "type": {
+      "$ref": "#/$defs/TestType",
+      "default": "functional"
+    },
+    "component": {
+      "title": "Component",
+      "type": "string"
+    },
+    "subcomponent": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Subcomponent"
+    },
+    "owner": {
+      "title": "Owner",
+      "type": "string"
+    },
+    "tags": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+    },
+    "requirements": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Requirements",
+      "type": "array"
+    },
+    "preconditions": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Preconditions",
+      "type": "array"
+    },
+    "test_data": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Test Data",
+      "type": "array"
+    },
+    "shared_steps": {
+      "default": [],
+      "items": {
+        "pattern": "^(TC|SS|PLAN|STORY|SUITE)-[A-Z0-9][-A-Z0-9]*$",
+        "type": "string"
+      },
+      "title": "Shared Steps",
+      "type": "array"
+    },
+    "steps": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Step"
+      },
+      "title": "Steps",
+      "type": "array"
+    },
+    "automation": {
+      "$ref": "#/$defs/AutomationInfo",
+      "default": {
+        "status": "manual",
+        "framework": null,
+        "source": null
+      }
+    },
+    "review": {
+      "$ref": "#/$defs/ReviewInfo",
+      "default": {
+        "state": "draft",
+        "reviewers": []
+      }
+    },
+    "version": {
+      "default": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "change_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Change Reason"
+    },
+    "superseded_by": {
+      "anyOf": [
+        {
+          "pattern": "^(TC|SS|PLAN|STORY|SUITE)-[A-Z0-9][-A-Z0-9]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Superseded By"
+    },
+    "environment_constraints": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Environment Constraints",
+      "type": "array"
+    },
+    "body": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Body"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "component",
+    "owner"
+  ],
+  "title": "TestCase",
+  "type": "object"
+}

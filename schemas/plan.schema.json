@@ -1,0 +1,203 @@
+{
+  "$defs": {
+    "Environment": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "config": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "title": "Config",
+          "type": "object"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "Environment",
+      "type": "object"
+    },
+    "ExecutionMode": {
+      "enum": [
+        "manual",
+        "automated",
+        "mixed"
+      ],
+      "title": "ExecutionMode",
+      "type": "string"
+    },
+    "IncludeExclude": {
+      "properties": {
+        "tags_any": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags Any",
+          "type": "array"
+        },
+        "tags_all": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags All",
+          "type": "array"
+        },
+        "components_any": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Components Any",
+          "type": "array"
+        },
+        "priorities": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Priority"
+          },
+          "title": "Priorities",
+          "type": "array"
+        }
+      },
+      "title": "IncludeExclude",
+      "type": "object"
+    },
+    "Priority": {
+      "enum": [
+        "critical",
+        "high",
+        "medium",
+        "low"
+      ],
+      "title": "Priority",
+      "type": "string"
+    },
+    "ScopeSelector": {
+      "properties": {
+        "product": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Product"
+        },
+        "release": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Release"
+        }
+      },
+      "title": "ScopeSelector",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "id": {
+      "pattern": "^(TC|SS|PLAN|STORY|SUITE)-[A-Z0-9][-A-Z0-9]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Description"
+    },
+    "scope": {
+      "$ref": "#/$defs/ScopeSelector",
+      "default": {
+        "product": null,
+        "release": null
+      }
+    },
+    "include": {
+      "$ref": "#/$defs/IncludeExclude",
+      "default": {
+        "tags_any": [],
+        "tags_all": [],
+        "components_any": [],
+        "priorities": []
+      }
+    },
+    "exclude": {
+      "$ref": "#/$defs/IncludeExclude",
+      "default": {
+        "tags_any": [],
+        "tags_all": [],
+        "components_any": [],
+        "priorities": []
+      }
+    },
+    "environments": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Environment"
+      },
+      "title": "Environments",
+      "type": "array"
+    },
+    "execution": {
+      "$ref": "#/$defs/ExecutionMode",
+      "default": "mixed"
+    },
+    "assignees": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Assignees",
+      "type": "array"
+    },
+    "approvals": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Approvals",
+      "type": "array"
+    },
+    "explicit_cases": {
+      "default": [],
+      "items": {
+        "pattern": "^(TC|SS|PLAN|STORY|SUITE)-[A-Z0-9][-A-Z0-9]*$",
+        "type": "string"
+      },
+      "title": "Explicit Cases",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "title"
+  ],
+  "title": "Plan",
+  "type": "object"
+}
