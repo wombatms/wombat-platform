@@ -30,6 +30,30 @@ W_COS = 0.7
 W_BM25 = 0.3
 
 
+def blend(
+    cos: float,
+    bm25: float,
+    w_cos: float = W_COS,
+    w_bm25: float = W_BM25,
+) -> float:
+    """Combine a cosine similarity score and a BM25 rank score into one hybrid score.
+
+    This pure-Python function mirrors the weighted sum used in the Postgres query
+    (``w_cos * cos_score + w_bm * bm25_score``).  Keeping the arithmetic here
+    means the test suite can verify the blend weights without Postgres.
+
+    Args:
+        cos:   Cosine similarity in [0, 1] (1.0 − pgvector cosine distance).
+        bm25:  BM25 ts_rank_cd score (non-negative; typically < 1 for short queries).
+        w_cos: Weight for the cosine term (default 0.7).
+        w_bm25: Weight for the BM25 term (default 0.3).
+
+    Returns:
+        Combined score as a float.
+    """
+    return w_cos * cos + w_bm25 * bm25
+
+
 async def hybrid_search(
     session: AsyncSession,
     *,
@@ -140,6 +164,8 @@ async def _postgres_search(
 
     w_cos = W_COS if mode in ("hybrid", "semantic") else 0.0
     w_bm = W_BM25 if mode in ("hybrid", "keyword") else 0.0
+    # Use the same arithmetic as the pure-Python blend() helper so that the
+    # test suite can verify the weights without Postgres.
     combined = (w_cos * cos_score + w_bm * bm25_score).label("score")
 
     q = (
