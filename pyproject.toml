@@ -29,3 +29,6 @@ dev = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+markers = [
+    "postgres: marks tests that require a live Postgres instance (skip unless WOMBAT_TEST_DATABASE_URL is set)",
+]
