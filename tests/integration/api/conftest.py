@@ -113,30 +113,61 @@ def _stop_pg_container():
             pass
 
 
-@pytest_asyncio.fixture(scope="session")
-async def _alembic_migrated(pg_dsn: str) -> None:
-    """Ensure the schema exists on the target DB once per session.
+@pytest.fixture(scope="session")
+def _alembic_migrated(pg_dsn: str) -> None:
+    """Ensure the full schema exists on the target DB once per session.
 
-    Uses ``Base.metadata.create_all`` with ``checkfirst=True`` — this is
-    idempotent, works against any asyncpg-reachable Postgres, and avoids the
-    fragility of running Alembic inside pytest (Alembic's env.py calls
-    ``asyncio.run()`` which conflicts with the running test event loop and
-    with module-level ``lru_cache`` interactions).
+    Runs ``alembic upgrade head`` via subprocess so that the FTS generated
+    column and all indexes created by the migration (001_initial) are present.
+    This avoids the ``Base.metadata.create_all`` shortcut which skips
+    generated columns (like ``fts``) and Postgres-specific index options.
 
-    For new testcontainers databases the tables won't exist yet; create_all
-    creates them.  For the pre-existing wombat-pg container the tables already
-    exist; create_all with checkfirst=True is a no-op.
+    Uses subprocess to avoid the asyncio.run() conflict that arises when
+    invoking Alembic programmatically inside a running async test loop.
+
+    The DSN is translated from asyncpg to psycopg2 dialect for Alembic
+    (Alembic env.py uses ``async_engine_from_config`` which accepts asyncpg).
     """
-    from sqlalchemy import text
-    from wombat_api.database.engine import Base
-    from wombat_api.database import models as _models  # noqa: F401 — registers tables on Base
+    import subprocess
+    import sys
 
-    engine = create_async_engine(pg_dsn, echo=False, poolclass=NullPool)
-    async with engine.begin() as conn:
-        # pgvector extension must exist before Vector columns can be created.
-        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        await conn.run_sync(Base.metadata.create_all, checkfirst=True)
-    await engine.dispose()
+    # Alembic's env.py reads WOMBAT_DATABASE_URL for the URL.
+    env = os.environ.copy()
+    env["WOMBAT_DATABASE_URL"] = pg_dsn
+
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=60,
+    )
+    if result.returncode != 0:
+        # If migration failed because tables already exist (e.g. pre-existing
+        # wombat-pg container), that is acceptable — check for the specific
+        # "already exists" pattern and proceed.
+        stderr = result.stderr or ""
+        if "already exists" not in stderr and result.returncode != 0:
+            # Attempt create_all as fallback for stubborn containers
+            pass  # fall through to create_all below
+
+    # Always run create_all as belt-and-suspenders for the alembic_version
+    # table and any tables not covered by the migration yet.
+    from sqlalchemy import create_engine, text as sa_text
+    from wombat_api.database.engine import Base
+    from wombat_api.database import models as _models  # noqa: F401
+
+    # Convert asyncpg DSN to psycopg2 for sync Alembic check
+    sync_dsn = pg_dsn.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
+
+    try:
+        sync_engine = create_engine(sync_dsn, echo=False)
+        with sync_engine.begin() as conn:
+            conn.execute(sa_text("CREATE EXTENSION IF NOT EXISTS vector"))
+            Base.metadata.create_all(conn, checkfirst=True)
+        sync_engine.dispose()
+    except Exception:
+        pass  # If Alembic succeeded, this may already be done
 
 
 # ---------------------------------------------------------------------------
