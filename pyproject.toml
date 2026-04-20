@@ -8,6 +8,7 @@ dependencies = [
     "wombat-core",
     "wombat-cli",
     "wombat-api",
+    "wombat-mcp",
 ]
 
 [tool.uv.workspace]
@@ -17,6 +18,7 @@ members = ["packages/*"]
 wombat-core = { workspace = true }
 wombat-cli = { workspace = true }
 wombat-api = { workspace = true }
+wombat-mcp = { workspace = true }
 
 [dependency-groups]
 dev = [
