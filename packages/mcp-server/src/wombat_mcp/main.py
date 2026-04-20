@@ -16,8 +16,8 @@ import mcp.types as types
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
+from wombat_mcp.prompts import get_wombat_prompt, list_wombat_prompts
 from wombat_mcp.resources import list_wombat_resources, read_wombat_resource
-from wombat_mcp.prompts import list_wombat_prompts, get_wombat_prompt
 from wombat_mcp.tools import build_tool_registry
 
 logger = logging.getLogger(__name__)
@@ -42,6 +42,7 @@ def create_server() -> Server:
     async def handle_call_tool(name: str, arguments: dict) -> list[types.TextContent]:
         result = await registry.call(name, arguments)
         import json
+
         text = json.dumps(result, default=str) if not isinstance(result, str) else result
         return [types.TextContent(type="text", text=text)]
 
@@ -58,9 +59,7 @@ def create_server() -> Server:
         return list_wombat_prompts()
 
     @server.get_prompt()
-    async def handle_get_prompt(
-        name: str, arguments: dict[str, str] | None
-    ) -> types.GetPromptResult:
+    async def handle_get_prompt(name: str, arguments: dict[str, str] | None) -> types.GetPromptResult:
         return await get_wombat_prompt(name, arguments or {})
 
     return server

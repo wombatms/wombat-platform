@@ -23,12 +23,11 @@ import uuid
 
 import pytest
 import pytest_asyncio
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from wombat_api.database.engine import Base
 from wombat_api.database.models import Content, ProjectDB
 from wombat_api.database.repository import Repository, content_hash_for
-
 
 # ---------------------------------------------------------------------------
 # Shared fixture: in-memory SQLite session
@@ -119,8 +118,7 @@ async def test_list_content_scoped_to_project(session):
     assert len(rows) == 2
     for row in rows:
         assert row.project_id == proj_a.id, (
-            f"Row {row.wombat_id} has project_id={row.project_id} "
-            f"but expected {proj_a.id}"
+            f"Row {row.wombat_id} has project_id={row.project_id} but expected {proj_a.id}"
         )
 
 
@@ -162,16 +160,12 @@ async def test_get_content_by_wombat_id_scoped_to_project(session):
 
     repo = Repository(session)
 
-    result_a = await repo.get_content_by_wombat_id(
-        project_id=proj_a.id, kind="testcase", wombat_id=shared_wid
-    )
+    result_a = await repo.get_content_by_wombat_id(project_id=proj_a.id, kind="testcase", wombat_id=shared_wid)
     assert result_a is not None
     assert result_a.id == row_a.id
     assert result_a.title == "Title from A"
 
-    result_b = await repo.get_content_by_wombat_id(
-        project_id=proj_b.id, kind="testcase", wombat_id=shared_wid
-    )
+    result_b = await repo.get_content_by_wombat_id(project_id=proj_b.id, kind="testcase", wombat_id=shared_wid)
     assert result_b is not None
     assert result_b.id == row_b.id
     assert result_b.title == "Title from B"
@@ -222,7 +216,5 @@ async def test_get_content_by_wombat_id_returns_none_for_wrong_project(session):
     await session.flush()
 
     repo = Repository(session)
-    result = await repo.get_content_by_wombat_id(
-        project_id=proj_a.id, kind="testcase", wombat_id="TC-B-ONLY"
-    )
+    result = await repo.get_content_by_wombat_id(project_id=proj_a.id, kind="testcase", wombat_id="TC-B-ONLY")
     assert result is None, "Must not return a row from a different project"

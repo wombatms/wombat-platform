@@ -13,9 +13,7 @@ from .conftest import parse_json_output
 
 class TestListCommand:
     def test_list_returns_all_entities(self, runner: CliRunner, populated_project: Path):
-        result = runner.invoke(
-            app, ["list", "--directory", str(populated_project), "--json"]
-        )
+        result = runner.invoke(app, ["list", "--directory", str(populated_project), "--json"])
         assert result.exit_code == 0
         data = parse_json_output(result.output)
         assert data["count"] >= 5  # 2 TCs + 1 SS + 1 Plan + 1 Story
@@ -25,8 +23,10 @@ class TestListCommand:
             app,
             [
                 "list",
-                "--directory", str(populated_project),
-                "--component", "auth",
+                "--directory",
+                str(populated_project),
+                "--component",
+                "auth",
                 "--json",
             ],
         )
@@ -39,8 +39,10 @@ class TestListCommand:
             app,
             [
                 "list",
-                "--directory", str(populated_project),
-                "--type", "testcase",
+                "--directory",
+                str(populated_project),
+                "--type",
+                "testcase",
                 "--json",
             ],
         )
@@ -54,8 +56,10 @@ class TestListCommand:
             app,
             [
                 "list",
-                "--directory", str(populated_project),
-                "--owner", "qa-auth-team",
+                "--directory",
+                str(populated_project),
+                "--owner",
+                "qa-auth-team",
                 "--json",
             ],
         )
@@ -68,8 +72,10 @@ class TestListCommand:
             app,
             [
                 "list",
-                "--directory", str(populated_project),
-                "--type", "testcase",
+                "--directory",
+                str(populated_project),
+                "--type",
+                "testcase",
                 "--ids-only",
                 "--json",
             ],
@@ -85,8 +91,10 @@ class TestListCommand:
             app,
             [
                 "list",
-                "--directory", str(populated_project),
-                "--type", "testcase",
+                "--directory",
+                str(populated_project),
+                "--type",
+                "testcase",
                 "--count",
                 "--json",
             ],
@@ -100,8 +108,10 @@ class TestListCommand:
             app,
             [
                 "list",
-                "--directory", str(populated_project),
-                "--limit", "1",
+                "--directory",
+                str(populated_project),
+                "--limit",
+                "1",
                 "--json",
             ],
         )
@@ -126,9 +136,7 @@ class TestListCommand:
         assert len(paged_data["results"]) == total - 2
 
     def test_list_human_output_exits_0(self, runner: CliRunner, populated_project: Path):
-        result = runner.invoke(
-            app, ["list", "--directory", str(populated_project)]
-        )
+        result = runner.invoke(app, ["list", "--directory", str(populated_project)])
         assert result.exit_code == 0
 
     def test_list_no_init_exits_1(self, runner: CliRunner, tmp_path: Path):
@@ -140,8 +148,10 @@ class TestListCommand:
             app,
             [
                 "list",
-                "--directory", str(populated_project),
-                "--tags", "smoke",
+                "--directory",
+                str(populated_project),
+                "--tags",
+                "smoke",
                 "--json",
             ],
         )
@@ -149,12 +159,8 @@ class TestListCommand:
         data = parse_json_output(result.output)
         assert data["count"] >= 1
 
-    def test_list_json_response_has_pagination_fields(
-        self, runner: CliRunner, populated_project: Path
-    ):
-        result = runner.invoke(
-            app, ["list", "--directory", str(populated_project), "--json"]
-        )
+    def test_list_json_response_has_pagination_fields(self, runner: CliRunner, populated_project: Path):
+        result = runner.invoke(app, ["list", "--directory", str(populated_project), "--json"])
         assert result.exit_code == 0
         data = parse_json_output(result.output)
         assert "count" in data

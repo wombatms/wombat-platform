@@ -9,6 +9,7 @@ from wombat_core.rag.embedders.base import Embedder
 class FakeEmbedder(Embedder):
     name = "fake"
     dim = 4
+
     async def embed_batch(self, texts):
         return [[float(len(t)), 0.0, 0.0, 0.0] for t in texts]
 

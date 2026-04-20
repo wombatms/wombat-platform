@@ -9,9 +9,7 @@ from wombat_core.models import Plan, Suite, TestCase
 
 class TaxonomyRule(LintRule):
     name = "taxonomy"
-    description = (
-        "Warn when component or environment names are not in the configured taxonomy lists."
-    )
+    description = "Warn when component or environment names are not in the configured taxonomy lists."
 
     def check(self, entity: WombatEntity, config: WombatConfig) -> list[LintIssue]:
         issues: list[LintIssue] = []
@@ -26,8 +24,7 @@ class TaxonomyRule(LintRule):
                         rule=self.name,
                         severity="warning",
                         message=(
-                            f"component '{component}' is not in the configured taxonomy "
-                            f"({', '.join(components)})"
+                            f"component '{component}' is not in the configured taxonomy ({', '.join(components)})"
                         ),
                         entity_id=entity.id,
                         field="component",

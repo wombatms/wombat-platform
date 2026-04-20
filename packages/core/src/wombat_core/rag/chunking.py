@@ -17,7 +17,10 @@ def should_chunk(text: str, *, max_tokens: int) -> bool:
 
 
 def chunk_text(
-    text: str, *, max_tokens: int, overlap_tokens: int,
+    text: str,
+    *,
+    max_tokens: int,
+    overlap_tokens: int,
 ) -> list[str]:
     toks = _tokens(text)
     if len(toks) <= max_tokens:
@@ -36,7 +39,10 @@ def chunk_text(
 
 
 def chunk_markdown(
-    md: str, *, max_tokens: int, overlap_tokens: int,
+    md: str,
+    *,
+    max_tokens: int,
+    overlap_tokens: int,
 ) -> list[str]:
     """Prefer splitting at heading boundaries; fall back to token-window."""
     # Split into heading-sections first.
@@ -66,8 +72,7 @@ def chunk_markdown(
             out.append("".join(current))
         # If the section alone exceeds max_tokens, token-window it.
         if sec_tokens > max_tokens:
-            out.extend(chunk_text(sec, max_tokens=max_tokens,
-                                  overlap_tokens=overlap_tokens))
+            out.extend(chunk_text(sec, max_tokens=max_tokens, overlap_tokens=overlap_tokens))
             current = []
             current_tokens = 0
         else:

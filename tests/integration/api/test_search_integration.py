@@ -34,11 +34,10 @@ class _FakeEmbedder:
 
     async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         from wombat_api.database.models import EMBED_DIM
+
         # Each text gets a deterministic unit vector based on its length
         return [
-            [float((i * 7 + j) % 100) / 100.0 if j == 0 else 0.0
-             for j in range(EMBED_DIM)]
-            for i, _ in enumerate(texts)
+            [float((i * 7 + j) % 100) / 100.0 if j == 0 else 0.0 for j in range(EMBED_DIM)] for i, _ in enumerate(texts)
         ]
 
 
@@ -54,6 +53,7 @@ def _patch_search_embedder():
     sentence-transformers being loaded.
     """
     import wombat_api.routes.search as _search_mod
+
     with patch.object(_search_mod, "_get_embedder", return_value=_FAKE_EMBEDDER_INSTANCE):
         # Also reset the cached embedder so the patch takes effect
         orig = _search_mod._embedder
@@ -72,7 +72,6 @@ async def _create_and_seed_project(
 
     Each testcase dict: {wombat_id, title, tags, body_text}
     """
-    from sqlalchemy.ext.asyncio import async_sessionmaker
     from wombat_api.database.models import ProjectDB
     from wombat_api.database.repository import Repository
 
@@ -95,7 +94,7 @@ async def _create_and_seed_project(
         texts = [tc["title"] + " " + tc["body_text"] for tc in testcases]
         vectors = await embedder.embed_batch(texts)
 
-        for tc, vec in zip(testcases, vectors):
+        for tc, vec in zip(testcases, vectors, strict=False):
             await repo.upsert_content(
                 project_id=project.id,
                 kind="testcase",
@@ -167,18 +166,12 @@ async def _setup_two_projects(db_session, async_engine, users):
     slug_a = f"search-proj-a-{uuid.uuid4().hex[:6]}"
     slug_b = f"search-proj-b-{uuid.uuid4().hex[:6]}"
 
-    project_a = await _create_and_seed_project(
-        db_session, async_engine, slug_a, _PROJECT_A_TESTCASES
-    )
-    project_b = await _create_and_seed_project(
-        db_session, async_engine, slug_b, _PROJECT_B_TESTCASES
-    )
+    project_a = await _create_and_seed_project(db_session, async_engine, slug_a, _PROJECT_A_TESTCASES)
+    project_b = await _create_and_seed_project(db_session, async_engine, slug_b, _PROJECT_B_TESTCASES)
 
     # viewer user has role on project A ONLY
     viewer_user = users["viewer"]["user"]
-    role_a = UserProjectRoleDB(
-        user_id=viewer_user.id, project_id=project_a.id, role="viewer"
-    )
+    role_a = UserProjectRoleDB(user_id=viewer_user.id, project_id=project_a.id, role="viewer")
     db_session.add(role_a)
     await db_session.commit()
 
@@ -199,24 +192,19 @@ async def test_semantic_search_returns_only_project_a_hits(
     seeded_project,
 ):
     """Semantic search returns hits ONLY from project A; no project B IDs."""
-    project_a, project_b, slug_a, slug_b = await _setup_two_projects(
-        db_session, async_engine, users
-    )
+    project_a, project_b, slug_a, slug_b = await _setup_two_projects(db_session, async_engine, users)
     viewer_token = users["viewer"]["token"]
 
     # Collect all project B content IDs for cross-check
     from sqlalchemy import select
-    from wombat_api.database.models import Content
     from sqlalchemy.ext.asyncio import async_sessionmaker as _sm
+
+    from wombat_api.database.models import Content
 
     factory = _sm(async_engine, expire_on_commit=False)
     async with factory() as s:
         b_rows = (
-            await s.execute(
-                select(Content.id, Content.wombat_id).where(
-                    Content.project_id == project_b.id
-                )
-            )
+            await s.execute(select(Content.id, Content.wombat_id).where(Content.project_id == project_b.id))
         ).all()
     b_ids = {str(r.id) for r in b_rows}
     b_wombat_ids = {r.wombat_id for r in b_rows}
@@ -233,13 +221,9 @@ async def test_semantic_search_returns_only_project_a_hits(
     # RBAC leakage check: no project B IDs appear
     hit_ids = {h["id"] for h in hits}
     hit_wombat_ids = {h.get("wombat_id") for h in hits if h.get("wombat_id")}
-    assert not (hit_ids & b_ids), (
-        f"RBAC LEAK: Project B IDs found in Project A search results: "
-        f"{hit_ids & b_ids}"
-    )
+    assert not (hit_ids & b_ids), f"RBAC LEAK: Project B IDs found in Project A search results: {hit_ids & b_ids}"
     assert not (hit_wombat_ids & b_wombat_ids), (
-        f"RBAC LEAK: Project B wombat_ids found in results: "
-        f"{hit_wombat_ids & b_wombat_ids}"
+        f"RBAC LEAK: Project B wombat_ids found in results: {hit_wombat_ids & b_wombat_ids}"
     )
 
     # Also verify source repo is from test-repo (project A's content)
@@ -256,22 +240,17 @@ async def test_hybrid_search_returns_only_project_a_hits(
     seeded_project,
 ):
     """Hybrid search (cosine + BM25) returns hits ONLY from project A."""
-    project_a, project_b, slug_a, slug_b = await _setup_two_projects(
-        db_session, async_engine, users
-    )
+    project_a, project_b, slug_a, slug_b = await _setup_two_projects(db_session, async_engine, users)
     viewer_token = users["viewer"]["token"]
 
     from sqlalchemy import select
-    from wombat_api.database.models import Content
     from sqlalchemy.ext.asyncio import async_sessionmaker as _sm
+
+    from wombat_api.database.models import Content
 
     factory = _sm(async_engine, expire_on_commit=False)
     async with factory() as s:
-        b_rows = (
-            await s.execute(
-                select(Content.id).where(Content.project_id == project_b.id)
-            )
-        ).all()
+        b_rows = (await s.execute(select(Content.id).where(Content.project_id == project_b.id))).all()
     b_ids = {str(r.id) for r in b_rows}
 
     resp = await httpx_client.post(
@@ -284,9 +263,7 @@ async def test_hybrid_search_returns_only_project_a_hits(
     assert len(hits) > 0
 
     hit_ids = {h["id"] for h in hits}
-    assert not (hit_ids & b_ids), (
-        f"RBAC LEAK: Project B IDs found in hybrid search: {hit_ids & b_ids}"
-    )
+    assert not (hit_ids & b_ids), f"RBAC LEAK: Project B IDs found in hybrid search: {hit_ids & b_ids}"
 
 
 @pytest.mark.asyncio
@@ -298,22 +275,17 @@ async def test_keyword_search_returns_only_project_a_hits(
     seeded_project,
 ):
     """Keyword search returns hits ONLY from project A."""
-    project_a, project_b, slug_a, slug_b = await _setup_two_projects(
-        db_session, async_engine, users
-    )
+    project_a, project_b, slug_a, slug_b = await _setup_two_projects(db_session, async_engine, users)
     viewer_token = users["viewer"]["token"]
 
     from sqlalchemy import select
-    from wombat_api.database.models import Content
     from sqlalchemy.ext.asyncio import async_sessionmaker as _sm
+
+    from wombat_api.database.models import Content
 
     factory = _sm(async_engine, expire_on_commit=False)
     async with factory() as s:
-        b_rows = (
-            await s.execute(
-                select(Content.id).where(Content.project_id == project_b.id)
-            )
-        ).all()
+        b_rows = (await s.execute(select(Content.id).where(Content.project_id == project_b.id))).all()
     b_ids = {str(r.id) for r in b_rows}
 
     resp = await httpx_client.post(
@@ -325,9 +297,7 @@ async def test_keyword_search_returns_only_project_a_hits(
     hits = resp.json()["hits"]
     # keyword mode: results may be empty if FTS doesn't match, but no B IDs
     hit_ids = {h["id"] for h in hits}
-    assert not (hit_ids & b_ids), (
-        f"RBAC LEAK: Project B IDs in keyword results: {hit_ids & b_ids}"
-    )
+    assert not (hit_ids & b_ids), f"RBAC LEAK: Project B IDs in keyword results: {hit_ids & b_ids}"
 
 
 @pytest.mark.asyncio
@@ -339,9 +309,7 @@ async def test_search_project_b_without_role_returns_403(
     seeded_project,
 ):
     """A viewer of project A cannot search project B (403 RBAC enforcement)."""
-    project_a, project_b, slug_a, slug_b = await _setup_two_projects(
-        db_session, async_engine, users
-    )
+    project_a, project_b, slug_a, slug_b = await _setup_two_projects(db_session, async_engine, users)
     viewer_token = users["viewer"]["token"]
 
     resp = await httpx_client.post(
@@ -361,9 +329,7 @@ async def test_top_k_is_honored(
     seeded_project,
 ):
     """Search with top_k=2 returns at most 2 hits."""
-    project_a, project_b, slug_a, slug_b = await _setup_two_projects(
-        db_session, async_engine, users
-    )
+    project_a, project_b, slug_a, slug_b = await _setup_two_projects(db_session, async_engine, users)
     viewer_token = users["viewer"]["token"]
 
     resp = await httpx_client.post(
@@ -385,9 +351,7 @@ async def test_kind_filter_testcase_only(
     seeded_project,
 ):
     """Search with kinds=['testcase'] returns only testcase hits."""
-    project_a, project_b, slug_a, slug_b = await _setup_two_projects(
-        db_session, async_engine, users
-    )
+    project_a, project_b, slug_a, slug_b = await _setup_two_projects(db_session, async_engine, users)
     viewer_token = users["viewer"]["token"]
 
     resp = await httpx_client.post(
@@ -415,9 +379,7 @@ async def test_unauthenticated_search_returns_401(
     seeded_project,
 ):
     """Unauthenticated search request returns 401."""
-    project_a, project_b, slug_a, slug_b = await _setup_two_projects(
-        db_session, async_engine, users
-    )
+    project_a, project_b, slug_a, slug_b = await _setup_two_projects(db_session, async_engine, users)
 
     resp = await httpx_client.post(
         f"/api/projects/{slug_a}/search",

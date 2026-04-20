@@ -33,7 +33,6 @@ from pathlib import Path
 
 import yaml
 
-
 # ---------------------------------------------------------------------------
 # Default mapping: handles common column names case-insensitively.
 # ---------------------------------------------------------------------------
@@ -98,7 +97,7 @@ class MappingProfile:
     defaults: dict[str, str] = field(default_factory=dict)
 
     @classmethod
-    def from_yaml(cls, path: Path) -> "MappingProfile":
+    def from_yaml(cls, path: Path) -> MappingProfile:
         with open(path) as fh:
             raw = yaml.safe_load(fh) or {}
         columns = [
@@ -164,6 +163,7 @@ def load_profile(name: str) -> MappingProfile:
     """
     if name == "azure_devops":
         from wombat_core.importing.profiles.azure_devops import AZURE_DEVOPS_PROFILE
+
         return AZURE_DEVOPS_PROFILE
     # For any other name, fall back to the default auto-detect profile.
     return MappingProfile(name=name or "default")

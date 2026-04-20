@@ -22,10 +22,13 @@ KIND = "shared_step"
 
 def _row_out(r) -> dict:
     return {
-        "id": str(r.id), "kind": r.kind, "wombat_id": r.wombat_id,
-        "title": r.title, "tags": r.tags, "body": r.body,
-        "source": {"repo": r.source_repo, "path": r.source_path,
-                   "revision": r.source_revision},
+        "id": str(r.id),
+        "kind": r.kind,
+        "wombat_id": r.wombat_id,
+        "title": r.title,
+        "tags": r.tags,
+        "body": r.body,
+        "source": {"repo": r.source_repo, "path": r.source_path, "revision": r.source_revision},
         "synced_at": r.synced_at.isoformat(),
     }
 
@@ -42,19 +45,23 @@ async def list_shared_steps(
 ):
     repo = Repository(session)
     rows, total = await repo.list_content(
-        project_id=project.id, kind=KIND, tags=tag or None,
-        q_text=q, limit=limit, offset=offset,
+        project_id=project.id,
+        kind=KIND,
+        tags=tag or None,
+        q_text=q,
+        limit=limit,
+        offset=offset,
     )
     return {
         "data": [_row_out(r) for r in rows],
-        "pagination": {"total": total, "limit": limit,
-                       "offset": offset, "has_more": offset + len(rows) < total},
+        "pagination": {"total": total, "limit": limit, "offset": offset, "has_more": offset + len(rows) < total},
     }
 
 
 @router.get("/{project_slug}/shared-steps/{wombat_id}")
 async def get_shared_step(
-    project_slug: str, wombat_id: str,
+    project_slug: str,
+    wombat_id: str,
     project: ProjectDB = Depends(require_role(Role.viewer)),
     session: AsyncSession = Depends(get_session),
 ):

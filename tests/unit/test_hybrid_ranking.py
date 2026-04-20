@@ -13,10 +13,7 @@ from __future__ import annotations
 
 import math
 
-import pytest
-
-from wombat_api.search.hybrid import blend, W_COS, W_BM25
-
+from wombat_api.search.hybrid import W_BM25, W_COS, blend
 
 # ---------------------------------------------------------------------------
 # Basic arithmetic

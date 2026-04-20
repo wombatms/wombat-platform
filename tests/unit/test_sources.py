@@ -2,10 +2,8 @@
 
 from pathlib import Path
 
-import pytest
-
+from wombat_core.config.models import RagSourcesConfig
 from wombat_core.rag.sources import SourceResolver
-from wombat_core.config.models import AppRepoSource, RagSourcesConfig
 
 
 def test_test_repo_always_resolved(tmp_path: Path):

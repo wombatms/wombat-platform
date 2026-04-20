@@ -12,11 +12,10 @@ Scenarios:
 from __future__ import annotations
 
 import json
-import uuid
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class _FakeEmbedder:
@@ -25,13 +24,15 @@ class _FakeEmbedder:
 
     async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         from wombat_api.database.models import EMBED_DIM
+
         return [[0.0] * EMBED_DIM for _ in texts]
 
 
 async def _seed_testcases(db_session: AsyncSession, async_engine, project_id) -> list[str]:
     """Seed 3 testcases and return their wombat_ids."""
-    from wombat_api.database.repository import Repository
     from sqlalchemy.ext.asyncio import async_sessionmaker as _sm
+
+    from wombat_api.database.repository import Repository
 
     wombat_ids = ["TC-RUN-001", "TC-RUN-002", "TC-RUN-003"]
     factory = _sm(async_engine, expire_on_commit=False)
@@ -41,7 +42,7 @@ async def _seed_testcases(db_session: AsyncSession, async_engine, project_id) ->
         texts = [f"Test case {wid}" for wid in wombat_ids]
         vectors = await embedder.embed_batch(texts)
 
-        for wid, vec in zip(wombat_ids, vectors):
+        for wid, vec in zip(wombat_ids, vectors, strict=False):
             await repo.upsert_content(
                 project_id=project_id,
                 kind="testcase",
@@ -174,11 +175,13 @@ async def test_jsonl_ingest(
     run_id = run_resp.json()["data"]["id"]
 
     # Build JSONL body
-    jsonl_body = "\n".join([
-        json.dumps({"testcase_id": wombat_ids[0], "status": "pass"}),
-        json.dumps({"testcase_id": wombat_ids[1], "status": "fail"}),
-        json.dumps({"testcase_id": wombat_ids[2], "status": "skip"}),
-    ])
+    jsonl_body = "\n".join(
+        [
+            json.dumps({"testcase_id": wombat_ids[0], "status": "pass"}),
+            json.dumps({"testcase_id": wombat_ids[1], "status": "fail"}),
+            json.dumps({"testcase_id": wombat_ids[2], "status": "skip"}),
+        ]
+    )
 
     ingest_resp = await httpx_client.post(
         f"/api/projects/{slug}/runs/{run_id}/ingest",

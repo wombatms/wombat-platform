@@ -3,19 +3,19 @@
 from __future__ import annotations
 
 import fnmatch
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from collections.abc import Iterator
 
 from wombat_core.config.models import RagSourcesConfig
 
 
 @dataclass(frozen=True)
 class ResolvedFile:
-    source_repo: str           # "test-repo" | "app-repo:<name>" | "docs"
+    source_repo: str  # "test-repo" | "app-repo:<name>" | "docs"
     absolute_path: Path
-    source_path: str           # path relative to source root
-    revision: str              # current HEAD sha of the source repo
+    source_path: str  # path relative to source root
+    revision: str  # current HEAD sha of the source repo
 
 
 class SourceResolver:
@@ -90,6 +90,7 @@ def _matches_any(path: str, globs: list[str]) -> bool:
 def _git_head(root: Path) -> str:
     try:
         from git import Repo
+
         return Repo(str(root)).head.commit.hexsha
     except Exception:
         # test-repo may not be a git repo in test fixtures
@@ -98,6 +99,7 @@ def _git_head(root: Path) -> str:
 
 def _ensure_clone(local: Path, repo_url: str, ref: str) -> None:
     from git import Repo
+
     if local.exists():
         Repo(str(local)).remotes.origin.fetch()
         Repo(str(local)).git.checkout(ref)

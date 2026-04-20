@@ -197,9 +197,7 @@ class TestPlan:
             id="PLAN-RELEASE-2026-05-PAYMENTS",
             title="Payments release validation",
             scope=ScopeSelector(product="checkout", release="2026.05"),
-            include=IncludeExclude(
-                tags_any=["payments", "critical-path"], components_any=["payments"]
-            ),
+            include=IncludeExclude(tags_any=["payments", "critical-path"], components_any=["payments"]),
             exclude=IncludeExclude(tags_any=["deprecated"]),
             environments=[Environment(name="staging-us"), Environment(name="staging-eu")],
             execution=ExecutionMode.mixed,

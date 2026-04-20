@@ -14,10 +14,7 @@ from __future__ import annotations
 
 import unicodedata
 
-import pytest
-
 from wombat_api.database.repository import canonical_json, content_hash_for
-
 
 # ---------------------------------------------------------------------------
 # canonical_json invariants
@@ -153,8 +150,8 @@ def test_unicode_nfc_vs_nfd_policy():
     update this test with the rationale and note that content already indexed
     under the old scheme must be re-indexed.
     """
-    nfc_char = "\u00e9"          # é as a single precomposed code point
-    nfd_char = "\u0065\u0301"    # é as e + combining acute accent
+    nfc_char = "\u00e9"  # é as a single precomposed code point
+    nfd_char = "\u0065\u0301"  # é as e + combining acute accent
     # Sanity: these are visually identical but distinct byte sequences.
     assert nfc_char != nfd_char
     assert unicodedata.normalize("NFC", nfd_char) == nfc_char

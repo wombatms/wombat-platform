@@ -58,10 +58,7 @@ def search_command(
                 hint="Run `wombat init` first.",
             )
         else:
-            err_console.print(
-                "[red]Error:[/red] No .wombat/ directory found. "
-                "Run `wombat init` first."
-            )
+            err_console.print("[red]Error:[/red] No .wombat/ directory found. Run `wombat init` first.")
         raise typer.Exit(1)
 
     q = query.lower()

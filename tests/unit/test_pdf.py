@@ -2,8 +2,6 @@
 
 from pathlib import Path
 
-import pytest
-
 from wombat_core.rag.pdf import extract_pdf_text
 
 
@@ -18,6 +16,7 @@ def test_extract_simple_pdf(tmp_path: Path):
 def _write_minimal_pdf(path: Path, pages: list[str]) -> None:
     # Use reportlab if available; else inline a minimal PDF.
     from reportlab.pdfgen import canvas
+
     c = canvas.Canvas(str(path))
     for p in pages:
         c.drawString(72, 720, p)

@@ -1,6 +1,6 @@
 """Tests for chunking long-form content."""
 
-from wombat_core.rag.chunking import chunk_text, chunk_markdown, should_chunk
+from wombat_core.rag.chunking import chunk_markdown, chunk_text, should_chunk
 
 
 def test_short_text_not_chunked():
@@ -33,11 +33,14 @@ def test_chunks_overlap():
 def test_chunk_markdown_prefers_heading_splits():
     md = (
         "# Title\n"
-        + "intro paragraph " * 200 + "\n\n"
+        + "intro paragraph " * 200
+        + "\n\n"
         + "## Section A\n"
-        + "content A " * 200 + "\n\n"
+        + "content A " * 200
+        + "\n\n"
         + "## Section B\n"
-        + "content B " * 200 + "\n"
+        + "content B " * 200
+        + "\n"
     )
     chunks = chunk_markdown(md, max_tokens=400, overlap_tokens=40)
     # Expect at least one chunk boundary to be at a heading.

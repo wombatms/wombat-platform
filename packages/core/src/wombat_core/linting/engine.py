@@ -48,9 +48,7 @@ class LintRule(ABC):
         """Check a single entity; return any issues found."""
         ...
 
-    def check_corpus(
-        self, entities: list[WombatEntity], config: WombatConfig
-    ) -> list[LintIssue]:
+    def check_corpus(self, entities: list[WombatEntity], config: WombatConfig) -> list[LintIssue]:
         """Corpus-level check.  Default: call check() on every entity."""
         issues: list[LintIssue] = []
         for entity in entities:

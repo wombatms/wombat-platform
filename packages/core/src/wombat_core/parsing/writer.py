@@ -137,6 +137,7 @@ def _ordered_dict(entity: WombatEntity) -> dict:
 #   - emits plain strings without quotes where safe
 # ---------------------------------------------------------------------------
 
+
 class _WombatDumper(yaml.Dumper):
     pass
 

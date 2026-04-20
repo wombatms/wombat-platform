@@ -1,9 +1,7 @@
 """Tests for SQLAlchemy database models."""
 
 import uuid
-from datetime import datetime, timezone
-
-import pytest
+from datetime import UTC, datetime
 
 from wombat_api.database.models import (
     APITokenDB,
@@ -27,8 +25,8 @@ class TestModelsExist:
             name="Test Project",
             taxonomy_components=["auth"],
             taxonomy_environments=["staging"],
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
         assert p.slug == "test-project"
         assert p.__tablename__ == "projects"
@@ -40,7 +38,7 @@ class TestModelsExist:
             hashed_password="hashed",
             display_name="Test User",
             is_active=True,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         assert u.email == "test@example.com"
         assert u.__tablename__ == "users"
@@ -58,9 +56,9 @@ class TestModelsExist:
             source_path="testcases/tc-auth-login-0001.md",
             source_revision="abc123",
             content_hash="deadbeef",
-            synced_at=datetime.now(timezone.utc),
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            synced_at=datetime.now(UTC),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
         assert c.kind == "testcase"
         assert c.__tablename__ == "content"
@@ -78,9 +76,9 @@ class TestModelsExist:
             source_path="docs/ADR-012.md",
             source_revision="f00ba7",
             content_hash="cafebabe",
-            synced_at=datetime.now(timezone.utc),
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            synced_at=datetime.now(UTC),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
         assert c.wombat_id is None
         assert c.source_repo == "app-repo:my-service"
@@ -105,7 +103,7 @@ class TestModelsExist:
             source="api",
             status="pending",
             assignees=[],
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         assert r.status == "pending"
         assert r.__tablename__ == "runs"
@@ -118,17 +116,24 @@ class TestModelsExist:
             wombat_testcase_id="tc-auth-login-0001",
             status="pass",
             automated=True,
-            executed_at=datetime.now(timezone.utc),
-            created_at=datetime.now(timezone.utc),
+            executed_at=datetime.now(UTC),
+            created_at=datetime.now(UTC),
         )
         assert er.status == "pass"
         assert er.__tablename__ == "execution_results"
 
     def test_all_tablenames_unique(self):
         models = [
-            ProjectDB, UserDB, APITokenDB, UserProjectRoleDB,
-            Content, ContentChunk,
-            RunDB, ExecutionResultDB, SyncLogDB, AuditLogDB,
+            ProjectDB,
+            UserDB,
+            APITokenDB,
+            UserProjectRoleDB,
+            Content,
+            ContentChunk,
+            RunDB,
+            ExecutionResultDB,
+            SyncLogDB,
+            AuditLogDB,
         ]
         names = [m.__tablename__ for m in models]
         assert len(names) == len(set(names)), f"Duplicate: {names}"

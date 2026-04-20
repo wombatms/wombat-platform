@@ -123,9 +123,7 @@ class TestSerialiseEntity:
         assert "id: PLAN-RELEASE-2026" in out
 
     def test_suite_is_yaml(self):
-        suite = Suite(
-            id="SUITE-PAYMENTS-REGRESSION", title="Payments regression", owner="qa-team"
-        )
+        suite = Suite(id="SUITE-PAYMENTS-REGRESSION", title="Payments regression", owner="qa-team")
         out = serialise_entity(suite)
         assert not out.startswith("---\n")
 

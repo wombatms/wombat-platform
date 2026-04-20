@@ -121,24 +121,25 @@ def diff_command(
             print_json({"entity_id": entity_id, "entity": data})
         else:
             from wombat_cli.formatting import print_entity_detail
+
             print_entity_detail(data)
         sys.exit(0)
 
-    changed_fields = [
-        k for k in set(old_data) | set(new_data)
-        if old_data.get(k) != new_data.get(k)
-    ]
+    changed_fields = [k for k in set(old_data) | set(new_data) if old_data.get(k) != new_data.get(k)]
 
     if json_output:
-        print_json({
-            "entity_id": entity_id,
-            "old": old_data,
-            "new": new_data,
-            "changed_fields": changed_fields,
-        })
+        print_json(
+            {
+                "entity_id": entity_id,
+                "old": old_data,
+                "new": new_data,
+                "changed_fields": changed_fields,
+            }
+        )
     else:
         if not changed_fields:
             from wombat_cli.formatting.table_output import console
+
             console.print("[dim]No differences.[/dim]")
         else:
             print_diff(old_data, new_data, entity_id=entity_id)

@@ -20,10 +20,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import httpx
 import pytest
 import respx
-import httpx
-
 
 FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
 INTEGRATION_REPO = Path(__file__).parent.parent.parent / "fixtures" / "integration_repo"
@@ -33,9 +32,11 @@ INTEGRATION_REPO = Path(__file__).parent.parent.parent / "fixtures" / "integrati
 # Tool registry count tests
 # ---------------------------------------------------------------------------
 
+
 def test_tool_registry_both_mode_has_25_tools():
     """Both mode advertises exactly 25 tools."""
     from wombat_mcp.tools import build_tool_registry
+
     registry = build_tool_registry("both")
     tools = registry.tool_definitions()
     assert len(tools) == 25, f"Expected 25 tools in 'both' mode, got {len(tools)}: {[t.name for t in tools]}"
@@ -44,6 +45,7 @@ def test_tool_registry_both_mode_has_25_tools():
 def test_tool_registry_local_mode_has_5_tools():
     """Local mode advertises exactly 5 tools."""
     from wombat_mcp.tools import build_tool_registry
+
     registry = build_tool_registry("local")
     tools = registry.tool_definitions()
     assert len(tools) == 5, f"Expected 5 tools in 'local' mode, got {len(tools)}"
@@ -52,6 +54,7 @@ def test_tool_registry_local_mode_has_5_tools():
 def test_tool_registry_api_mode_has_20_tools():
     """API mode advertises exactly 20 tools."""
     from wombat_mcp.tools import build_tool_registry
+
     registry = build_tool_registry("api")
     tools = registry.tool_definitions()
     assert len(tools) == 20, f"Expected 20 tools in 'api' mode, got {len(tools)}"
@@ -60,6 +63,7 @@ def test_tool_registry_api_mode_has_20_tools():
 def test_both_mode_includes_all_local_and_api_tools():
     """Both mode includes all tools from local and api modes."""
     from wombat_mcp.tools import build_tool_registry
+
     r_both = build_tool_registry("both")
     r_local = build_tool_registry("local")
     r_api = build_tool_registry("api")
@@ -75,6 +79,7 @@ def test_both_mode_includes_all_local_and_api_tools():
 def test_local_tools_have_expected_names():
     """Local tools are named as expected."""
     from wombat_mcp.tools import build_tool_registry
+
     registry = build_tool_registry("local")
     names = {t.name for t in registry.tool_definitions()}
     expected = {"local:lint", "local:validate", "local:search", "local:parse", "local:diff"}
@@ -84,6 +89,7 @@ def test_local_tools_have_expected_names():
 # ---------------------------------------------------------------------------
 # Local tool tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_local_parse_returns_entity():
@@ -155,8 +161,9 @@ _BASE_URL = "http://localhost:8000"
 @pytest.mark.asyncio
 async def test_api_search_content_posts_correct_body():
     """api:search_content POSTs the correct body to /search."""
-    from wombat_mcp.tools import build_tool_registry
     import os
+
+    from wombat_mcp.tools import build_tool_registry
 
     registry = build_tool_registry("api")
     project = "test-proj"
@@ -171,13 +178,16 @@ async def test_api_search_content_posts_correct_body():
         os.environ["WOMBAT_API_URL"] = _BASE_URL
         os.environ["WOMBAT_API_TOKEN"] = "wombat_testtoken"
         try:
-            result = await registry.call("api:search_content", {
-                "project": project,
-                "query": "refund",
-                "kinds": ["testcase"],
-                "top_k": 5,
-                "mode": "hybrid",
-            })
+            result = await registry.call(
+                "api:search_content",
+                {
+                    "project": project,
+                    "query": "refund",
+                    "kinds": ["testcase"],
+                    "top_k": 5,
+                    "mode": "hybrid",
+                },
+            )
         finally:
             del os.environ["WOMBAT_API_URL"]
             del os.environ["WOMBAT_API_TOKEN"]
@@ -195,8 +205,9 @@ async def test_api_search_content_posts_correct_body():
 @pytest.mark.asyncio
 async def test_api_get_content_sends_correct_request():
     """api:get_content GETs /content/{content_id}."""
-    from wombat_mcp.tools import build_tool_registry
     import os
+
+    from wombat_mcp.tools import build_tool_registry
 
     registry = build_tool_registry("api")
     project = "test-proj"
@@ -212,10 +223,13 @@ async def test_api_get_content_sends_correct_request():
         os.environ["WOMBAT_API_URL"] = _BASE_URL
         os.environ["WOMBAT_API_TOKEN"] = "wombat_testtoken"
         try:
-            result = await registry.call("api:get_content", {
-                "project": project,
-                "content_id": content_id,
-            })
+            result = await registry.call(
+                "api:get_content",
+                {
+                    "project": project,
+                    "content_id": content_id,
+                },
+            )
         finally:
             del os.environ["WOMBAT_API_URL"]
             del os.environ["WOMBAT_API_TOKEN"]
@@ -227,8 +241,9 @@ async def test_api_get_content_sends_correct_request():
 @pytest.mark.asyncio
 async def test_api_find_related_testcases_with_draft_text():
     """api:find_related_testcases with draft_text POSTs to /search."""
-    from wombat_mcp.tools import build_tool_registry
     import os
+
+    from wombat_mcp.tools import build_tool_registry
 
     registry = build_tool_registry("api")
     project = "test-proj"
@@ -243,11 +258,14 @@ async def test_api_find_related_testcases_with_draft_text():
         os.environ["WOMBAT_API_URL"] = _BASE_URL
         os.environ["WOMBAT_API_TOKEN"] = "wombat_testtoken"
         try:
-            result = await registry.call("api:find_related_testcases", {
-                "project": project,
-                "draft_text": "user authentication flow",
-                "top_k": 5,
-            })
+            result = await registry.call(
+                "api:find_related_testcases",
+                {
+                    "project": project,
+                    "draft_text": "user authentication flow",
+                    "top_k": 5,
+                },
+            )
         finally:
             del os.environ["WOMBAT_API_URL"]
             del os.environ["WOMBAT_API_TOKEN"]
@@ -262,8 +280,9 @@ async def test_api_find_related_testcases_with_draft_text():
 @pytest.mark.asyncio
 async def test_api_find_related_testcases_with_testcase_id():
     """api:find_related_testcases with testcase_id GETs /content/{id}/related."""
-    from wombat_mcp.tools import build_tool_registry
     import os
+
+    from wombat_mcp.tools import build_tool_registry
 
     registry = build_tool_registry("api")
     project = "test-proj"
@@ -279,11 +298,14 @@ async def test_api_find_related_testcases_with_testcase_id():
         os.environ["WOMBAT_API_URL"] = _BASE_URL
         os.environ["WOMBAT_API_TOKEN"] = "wombat_testtoken"
         try:
-            result = await registry.call("api:find_related_testcases", {
-                "project": project,
-                "testcase_id": tc_id,
-                "top_k": 3,
-            })
+            result = await registry.call(
+                "api:find_related_testcases",
+                {
+                    "project": project,
+                    "testcase_id": tc_id,
+                    "top_k": 3,
+                },
+            )
         finally:
             del os.environ["WOMBAT_API_URL"]
             del os.environ["WOMBAT_API_TOKEN"]
@@ -294,8 +316,9 @@ async def test_api_find_related_testcases_with_testcase_id():
 @pytest.mark.asyncio
 async def test_api_list_sources_parses_response():
     """api:list_sources GETs /sources and parses the response."""
-    from wombat_mcp.tools import build_tool_registry
     import os
+
+    from wombat_mcp.tools import build_tool_registry
 
     registry = build_tool_registry("api")
     project = "test-proj"
@@ -331,8 +354,9 @@ async def test_api_list_sources_parses_response():
 @pytest.mark.asyncio
 async def test_api_find_related_testcases_requires_exactly_one_input():
     """find_related_testcases raises ValueError if both or neither inputs provided."""
-    from wombat_mcp.tools import build_tool_registry
     import os
+
+    from wombat_mcp.tools import build_tool_registry
 
     registry = build_tool_registry("api")
     os.environ["WOMBAT_API_URL"] = _BASE_URL
@@ -340,18 +364,23 @@ async def test_api_find_related_testcases_requires_exactly_one_input():
     try:
         # Neither testcase_id nor draft_text
         with pytest.raises((ValueError, Exception)):
-            await registry.call("api:find_related_testcases", {
-                "project": "test-proj",
-            })
+            await registry.call(
+                "api:find_related_testcases",
+                {
+                    "project": "test-proj",
+                },
+            )
 
         # Both testcase_id and draft_text
-        with pytest.raises((ValueError, Exception)):
-            with respx.mock(base_url=_BASE_URL):
-                await registry.call("api:find_related_testcases", {
+        with pytest.raises((ValueError, Exception)), respx.mock(base_url=_BASE_URL):
+            await registry.call(
+                "api:find_related_testcases",
+                {
                     "project": "test-proj",
                     "testcase_id": "abc",
                     "draft_text": "some text",
-                })
+                },
+            )
     finally:
         del os.environ["WOMBAT_API_URL"]
         del os.environ["WOMBAT_API_TOKEN"]
@@ -361,6 +390,7 @@ async def test_api_find_related_testcases_requires_exactly_one_input():
 async def test_unknown_tool_raises():
     """Calling an unknown tool raises ValueError."""
     from wombat_mcp.tools import build_tool_registry
+
     registry = build_tool_registry("both")
     with pytest.raises(ValueError, match="Unknown tool"):
         await registry.call("nonexistent:tool", {})

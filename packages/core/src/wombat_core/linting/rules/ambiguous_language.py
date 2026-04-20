@@ -79,10 +79,7 @@ class AmbiguousLanguageRule(LintRule):
                         LintIssue(
                             rule=self.name,
                             severity="warning",
-                            message=(
-                                f"{field_name} contains ambiguous language: "
-                                f"{', '.join(sorted(found))}"
-                            ),
+                            message=(f"{field_name} contains ambiguous language: {', '.join(sorted(found))}"),
                             entity_id=entity.id,
                             field=field_name,
                         )

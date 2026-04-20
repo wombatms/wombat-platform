@@ -48,7 +48,7 @@ async def upload_import(
     Returns the column headers and first 5 rows for inspection.
     Does not apply any mapping or write any entities.
     """
-    from wombat_core.importing.parser import parse_xlsx, parse_csv
+    from wombat_core.importing.parser import parse_csv, parse_xlsx
 
     with tempfile.NamedTemporaryFile(suffix=_safe_suffix(file.filename), delete=False) as tmp:
         tmp.write(await file.read())
@@ -68,10 +68,7 @@ async def upload_import(
     finally:
         tmp_path.unlink(missing_ok=True)
 
-    preview_rows = [
-        {h: (row[i] if i < len(row) else None) for i, h in enumerate(headers)}
-        for row in rows[:5]
-    ]
+    preview_rows = [{h: (row[i] if i < len(row) else None) for i, h in enumerate(headers)} for row in rows[:5]]
 
     return {
         "filename": file.filename,

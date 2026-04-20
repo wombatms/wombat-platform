@@ -9,17 +9,13 @@ from wombat_core.models import Story, Suite, TestCase
 
 class ReferenceIntegrityRule(LintRule):
     name = "reference_integrity"
-    description = (
-        "Error when an entity references a WombatID that does not exist in the corpus."
-    )
+    description = "Error when an entity references a WombatID that does not exist in the corpus."
 
     def check(self, entity: WombatEntity, config: WombatConfig) -> list[LintIssue]:
         # Cannot check in isolation; all work done in check_corpus.
         return []
 
-    def check_corpus(
-        self, entities: list[WombatEntity], config: WombatConfig
-    ) -> list[LintIssue]:
+    def check_corpus(self, entities: list[WombatEntity], config: WombatConfig) -> list[LintIssue]:
         all_ids: set[str] = {e.id for e in entities}
         issues: list[LintIssue] = []
 

@@ -44,10 +44,7 @@ def validate_command(
                 hint="Run `wombat init` first.",
             )
         else:
-            err_console.print(
-                "[red]Error:[/red] No .wombat/ directory found. "
-                "Run `wombat init` first."
-            )
+            err_console.print("[red]Error:[/red] No .wombat/ directory found. Run `wombat init` first.")
         raise typer.Exit(1)
 
     scan_root = paths[0] if paths else root
@@ -61,6 +58,7 @@ def validate_command(
             print_json({"errors": [], "total": 0, "valid": True})
         else:
             from wombat_cli.formatting.table_output import console
+
             console.print("[dim]No entities found to validate.[/dim]")
         sys.exit(0)
 
@@ -77,17 +75,18 @@ def validate_command(
     ]
 
     if json_output:
-        print_json({
-            "errors": errors_dicts,
-            "total": len(errors_dicts),
-            "valid": result.valid,
-        })
+        print_json(
+            {
+                "errors": errors_dicts,
+                "total": len(errors_dicts),
+                "valid": result.valid,
+            }
+        )
     else:
         if result.valid:
             from wombat_cli.formatting.table_output import console
-            console.print(
-                f"[green]All {len(entities)} entities are valid.[/green]"
-            )
+
+            console.print(f"[green]All {len(entities)} entities are valid.[/green]")
         else:
             print_issues(errors_dicts)
 

@@ -28,6 +28,7 @@ router = APIRouter()
 # Helper: project row → dict
 # ---------------------------------------------------------------------------
 
+
 def _project_out(p: ProjectDB) -> dict:
     return {
         "id": str(p.id),
@@ -44,6 +45,7 @@ def _project_out(p: ProjectDB) -> dict:
 # ---------------------------------------------------------------------------
 # Create project
 # ---------------------------------------------------------------------------
+
 
 @router.post("/", status_code=201)
 async def create_project(
@@ -71,6 +73,7 @@ async def create_project(
 # List projects for current user
 # ---------------------------------------------------------------------------
 
+
 @router.get("/")
 async def list_projects(
     user: UserDB = Depends(get_current_user),
@@ -85,6 +88,7 @@ async def list_projects(
 # ---------------------------------------------------------------------------
 # Get / update project
 # ---------------------------------------------------------------------------
+
 
 @router.get("/{project_slug}")
 async def get_project(
@@ -105,8 +109,7 @@ async def update_project(
 
     Only fields present in the body are updated.  Slug is immutable.
     """
-    allowed = {"name", "org", "default_owner",
-                "taxonomy_components", "taxonomy_environments"}
+    allowed = {"name", "org", "default_owner", "taxonomy_components", "taxonomy_environments"}
     for key, value in body.items():
         if key in allowed:
             setattr(project, key, value)
@@ -118,6 +121,7 @@ async def update_project(
 # Member management
 # ---------------------------------------------------------------------------
 
+
 @router.get("/{project_slug}/members")
 async def list_members(
     project: ProjectDB = Depends(require_role(Role.viewer)),
@@ -128,9 +132,7 @@ async def list_members(
     members = await repo.list_project_members(project.id)
     return {
         "data": [
-            {"user_id": str(u.id), "email": u.email,
-             "display_name": u.display_name, "role": r}
-            for u, r in members
+            {"user_id": str(u.id), "email": u.email, "display_name": u.display_name, "role": r} for u, r in members
         ]
     }
 
@@ -155,6 +157,7 @@ async def add_or_update_member(
         )
     # Verify user exists.
     from wombat_api.database.models import UserDB as _UserDB
+
     target = await session.get(_UserDB, member_user_id)
     if target is None:
         raise HTTPException(status_code=404, detail="User not found")

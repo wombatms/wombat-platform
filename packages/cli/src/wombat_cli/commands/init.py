@@ -81,10 +81,7 @@ def init_command(
                 hint="Use --force to overwrite.",
             )
         else:
-            err_console.print(
-                f"[yellow]Already initialised:[/yellow] {config_file} exists. "
-                "Use --force to overwrite."
-            )
+            err_console.print(f"[yellow]Already initialised:[/yellow] {config_file} exists. Use --force to overwrite.")
         raise typer.Exit(1)
 
     created: list[str] = []

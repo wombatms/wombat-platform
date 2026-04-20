@@ -44,10 +44,7 @@ def lint_command(
                 hint="Run `wombat init` first.",
             )
         else:
-            err_console.print(
-                "[red]Error:[/red] No .wombat/ directory found. "
-                "Run `wombat init` first."
-            )
+            err_console.print("[red]Error:[/red] No .wombat/ directory found. Run `wombat init` first.")
         raise typer.Exit(1)
 
     scan_root = paths[0] if paths else root
@@ -61,6 +58,7 @@ def lint_command(
             print_json({"issues": [], "total": 0})
         else:
             from wombat_cli.formatting.table_output import console
+
             console.print("[dim]No entities found to lint.[/dim]")
         sys.exit(0)
 
@@ -83,6 +81,7 @@ def lint_command(
     else:
         if not issues_dicts:
             from wombat_cli.formatting.table_output import console
+
             console.print("[green]No lint issues found.[/green]")
         else:
             print_issues(issues_dicts)

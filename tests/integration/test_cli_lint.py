@@ -15,16 +15,12 @@ from .conftest import parse_json_output
 
 class TestLintCommand:
     def test_lint_clean_project_exits_0(self, runner: CliRunner, populated_project: Path):
-        result = runner.invoke(
-            app, ["lint", "--directory", str(populated_project)]
-        )
+        result = runner.invoke(app, ["lint", "--directory", str(populated_project)])
         # Exit 0 = no issues; exit 2 = issues found
         assert result.exit_code in (0, 2)
 
     def test_lint_json_output_structure(self, runner: CliRunner, populated_project: Path):
-        result = runner.invoke(
-            app, ["lint", "--directory", str(populated_project), "--json"]
-        )
+        result = runner.invoke(app, ["lint", "--directory", str(populated_project), "--json"])
         assert result.exit_code in (0, 2)
         data = parse_json_output(result.output)
         assert "issues" in data
@@ -33,14 +29,10 @@ class TestLintCommand:
 
     def test_lint_specific_directory_clean(self, runner: CliRunner, populated_project: Path):
         tc_dir = populated_project / ".wombat" / "testcases"
-        result = runner.invoke(
-            app, ["lint", str(tc_dir), "--directory", str(populated_project)]
-        )
+        result = runner.invoke(app, ["lint", str(tc_dir), "--directory", str(populated_project)])
         assert result.exit_code in (0, 2)
 
-    def test_lint_finds_issues_in_bad_file(
-        self, runner: CliRunner, populated_project: Path
-    ):
+    def test_lint_finds_issues_in_bad_file(self, runner: CliRunner, populated_project: Path):
         # Write a test case with a very short title (< 10 chars) and no steps/summary.
         # QualityRule will warn on short title; RequiredFieldsRule will warn on
         # missing summary and missing steps. These produce exit_code 2.
@@ -67,9 +59,7 @@ class TestLintCommand:
         result = runner.invoke(app, ["lint", "--directory", str(tmp_path)])
         assert result.exit_code == 1
 
-    def test_lint_json_issues_have_required_fields(
-        self, runner: CliRunner, populated_project: Path
-    ):
+    def test_lint_json_issues_have_required_fields(self, runner: CliRunner, populated_project: Path):
         # Write something with a short title to trigger QualityRule
         bad_tc = TestCase(id="TC-AUTH-BADTC-001", title="Short", component="auth", owner="qa")
         tc_dir = populated_project / ".wombat" / "testcases"

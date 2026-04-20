@@ -39,10 +39,14 @@ class TestDiffCommand:
         result = runner.invoke(
             app,
             [
-                "diff", "TC-AUTH-DIFF-0001",
-                "--file-a", str(file_a),
-                "--file-b", str(file_b),
-                "--directory", str(populated_project),
+                "diff",
+                "TC-AUTH-DIFF-0001",
+                "--file-a",
+                str(file_a),
+                "--file-b",
+                str(file_b),
+                "--directory",
+                str(populated_project),
                 "--json",
             ],
         )
@@ -51,9 +55,7 @@ class TestDiffCommand:
             data = parse_json_output(result.output)
             assert "changed_fields" in data or "entity_id" in data
 
-    def test_diff_json_response_structure(
-        self, runner: CliRunner, populated_project: Path, tmp_path: Path
-    ):
+    def test_diff_json_response_structure(self, runner: CliRunner, populated_project: Path, tmp_path: Path):
         from wombat_core.models.testcase import TestCase
         from wombat_core.parsing.writer import write_entity
 
@@ -79,10 +81,14 @@ class TestDiffCommand:
         result = runner.invoke(
             app,
             [
-                "diff", "TC-AUTH-DIFFSTRUCT-001",
-                "--file-a", str(file_a),
-                "--file-b", str(file_b),
-                "--directory", str(populated_project),
+                "diff",
+                "TC-AUTH-DIFFSTRUCT-001",
+                "--file-a",
+                str(file_a),
+                "--file-b",
+                str(file_b),
+                "--directory",
+                str(populated_project),
                 "--json",
             ],
         )

@@ -12,15 +12,15 @@ All API calls are mocked with respx so no live server is required.
 from __future__ import annotations
 
 import json
-import os
+
+import httpx
 import pytest
 import respx
-import httpx
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(autouse=True)
 def set_api_env(monkeypatch):
@@ -32,6 +32,7 @@ def set_api_env(monkeypatch):
 # ---------------------------------------------------------------------------
 # search_content — correct POST body
 # ---------------------------------------------------------------------------
+
 
 @respx.mock
 @pytest.mark.asyncio
@@ -49,10 +50,12 @@ async def test_search_content_minimal_body():
         return_value=httpx.Response(200, json=expected_response)
     )
 
-    result = await _search_content({
-        "project": "myproject",
-        "query": "login",
-    })
+    result = await _search_content(
+        {
+            "project": "myproject",
+            "query": "login",
+        }
+    )
 
     assert route.called
     sent = json.loads(route.calls[0].request.content)
@@ -75,14 +78,16 @@ async def test_search_content_full_params():
         return_value=httpx.Response(200, json={"hits": [], "query": "auth", "mode": "semantic", "total_returned": 0})
     )
 
-    await _search_content({
-        "project": "proj",
-        "query": "auth",
-        "kinds": ["testcase"],
-        "tags": ["regression"],
-        "top_k": 5,
-        "mode": "semantic",
-    })
+    await _search_content(
+        {
+            "project": "proj",
+            "query": "auth",
+            "kinds": ["testcase"],
+            "tags": ["regression"],
+            "top_k": 5,
+            "mode": "semantic",
+        }
+    )
 
     assert route.called
     sent = json.loads(route.calls[0].request.content)
@@ -95,6 +100,7 @@ async def test_search_content_full_params():
 # ---------------------------------------------------------------------------
 # get_content — UUID vs wombat_id
 # ---------------------------------------------------------------------------
+
 
 @respx.mock
 @pytest.mark.asyncio
@@ -150,6 +156,7 @@ async def test_get_content_story_wombat_id():
 # find_related_testcases — routing logic
 # ---------------------------------------------------------------------------
 
+
 @respx.mock
 @pytest.mark.asyncio
 async def test_find_related_testcases_by_draft_text():
@@ -157,15 +164,15 @@ async def test_find_related_testcases_by_draft_text():
     from wombat_mcp.tools.api import _find_related_testcases
 
     expected = {"hits": [], "query": "login form", "mode": "semantic", "total_returned": 0}
-    route = respx.post("http://test-api/api/projects/proj/search").mock(
-        return_value=httpx.Response(200, json=expected)
-    )
+    route = respx.post("http://test-api/api/projects/proj/search").mock(return_value=httpx.Response(200, json=expected))
 
-    result = await _find_related_testcases({
-        "project": "proj",
-        "draft_text": "login form with invalid credentials",
-        "top_k": 3,
-    })
+    result = await _find_related_testcases(
+        {
+            "project": "proj",
+            "draft_text": "login form with invalid credentials",
+            "top_k": 3,
+        }
+    )
 
     assert route.called
     sent = json.loads(route.calls[0].request.content)
@@ -184,15 +191,17 @@ async def test_find_related_testcases_by_testcase_id():
 
     tc_id = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
     expected = {"hits": [], "source_id": tc_id, "total_returned": 0}
-    route = respx.get(
-        f"http://test-api/api/projects/proj/content/{tc_id}/related"
-    ).mock(return_value=httpx.Response(200, json=expected))
+    route = respx.get(f"http://test-api/api/projects/proj/content/{tc_id}/related").mock(
+        return_value=httpx.Response(200, json=expected)
+    )
 
-    result = await _find_related_testcases({
-        "project": "proj",
-        "testcase_id": tc_id,
-        "top_k": 5,
-    })
+    result = await _find_related_testcases(
+        {
+            "project": "proj",
+            "testcase_id": tc_id,
+            "top_k": 5,
+        }
+    )
 
     assert route.called
     # Verify top_k was passed as a query param
@@ -206,11 +215,13 @@ async def test_find_related_testcases_requires_exactly_one():
     from wombat_mcp.tools.api import _find_related_testcases
 
     with pytest.raises(ValueError, match="exactly one"):
-        await _find_related_testcases({
-            "project": "proj",
-            "testcase_id": "abc",
-            "draft_text": "some text",
-        })
+        await _find_related_testcases(
+            {
+                "project": "proj",
+                "testcase_id": "abc",
+                "draft_text": "some text",
+            }
+        )
 
     with pytest.raises(ValueError, match="exactly one"):
         await _find_related_testcases({"project": "proj"})
@@ -219,6 +230,7 @@ async def test_find_related_testcases_requires_exactly_one():
 # ---------------------------------------------------------------------------
 # list_sources — response parsing
 # ---------------------------------------------------------------------------
+
 
 @respx.mock
 @pytest.mark.asyncio
@@ -240,9 +252,7 @@ async def test_list_sources_parses_response():
             },
         ]
     }
-    respx.get("http://test-api/api/projects/proj/sources").mock(
-        return_value=httpx.Response(200, json=payload)
-    )
+    respx.get("http://test-api/api/projects/proj/sources").mock(return_value=httpx.Response(200, json=payload))
 
     result = await _list_sources({"project": "proj"})
 
@@ -260,9 +270,7 @@ async def test_list_sources_empty():
     """list_sources handles an empty sources list."""
     from wombat_mcp.tools.api import _list_sources
 
-    respx.get("http://test-api/api/projects/proj/sources").mock(
-        return_value=httpx.Response(200, json={"sources": []})
-    )
+    respx.get("http://test-api/api/projects/proj/sources").mock(return_value=httpx.Response(200, json={"sources": []}))
     result = await _list_sources({"project": "proj"})
     assert result["sources"] == []
 
@@ -270,6 +278,7 @@ async def test_list_sources_empty():
 # ---------------------------------------------------------------------------
 # ToolRegistry — build_tool_registry
 # ---------------------------------------------------------------------------
+
 
 def test_build_tool_registry_local_mode():
     """In local mode only local: tools are registered."""

@@ -6,7 +6,6 @@ Server-mode and live-Postgres tests are integration-only.
 
 from __future__ import annotations
 
-import pytest
 from typer.testing import CliRunner
 
 from wombat_cli.main import app

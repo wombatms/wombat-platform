@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import os
-from functools import lru_cache
 from dataclasses import dataclass, field
+from functools import lru_cache
 
 
 @dataclass(frozen=True)
@@ -15,8 +15,8 @@ class Config:
     jwt_refresh_days: int = 30
     debug: bool = False
     cors_origins: list[str] = field(default_factory=lambda: ["*"])
-    embed_dim: int = 384                     # default matches bge-small-en-v1.5
-    embedder_provider: str = "local"          # "local" | "openai"
+    embed_dim: int = 384  # default matches bge-small-en-v1.5
+    embedder_provider: str = "local"  # "local" | "openai"
     embedder_model: str = "bge-small-en-v1.5"
     openai_api_key: str | None = None
     # Working dir for cloned external source repos for RAG
@@ -37,9 +37,7 @@ def get_config() -> Config:
         cors_origins=os.environ.get("WOMBAT_CORS_ORIGINS", "*").split(","),
         embed_dim=int(os.environ.get("WOMBAT_EMBED_DIM", 384)),
         embedder_provider=os.environ.get("WOMBAT_EMBEDDER_PROVIDER", "local"),
-        embedder_model=os.environ.get(
-            "WOMBAT_EMBEDDER_MODEL", "bge-small-en-v1.5"
-        ),
+        embedder_model=os.environ.get("WOMBAT_EMBEDDER_MODEL", "bge-small-en-v1.5"),
         openai_api_key=os.environ.get("OPENAI_API_KEY"),
         sources_root=os.environ.get("WOMBAT_SOURCES_ROOT", ".wombat/sources"),
     )

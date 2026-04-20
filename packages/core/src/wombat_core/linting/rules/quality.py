@@ -28,10 +28,7 @@ class QualityRule(LintRule):
                 LintIssue(
                     rule=self.name,
                     severity="warning",
-                    message=(
-                        f"title is very short ({len(entity.title.strip())} chars); "
-                        f"aim for at least {min_title}"
-                    ),
+                    message=(f"title is very short ({len(entity.title.strip())} chars); aim for at least {min_title}"),
                     entity_id=entity.id,
                     field="title",
                 )
@@ -44,10 +41,7 @@ class QualityRule(LintRule):
                     LintIssue(
                         rule=self.name,
                         severity="warning",
-                        message=(
-                            f"only {len(entity.steps)} step(s); "
-                            f"consider adding more (recommended ≥ {min_steps})"
-                        ),
+                        message=(f"only {len(entity.steps)} step(s); consider adding more (recommended ≥ {min_steps})"),
                         entity_id=entity.id,
                         field="steps",
                     )
@@ -61,10 +55,7 @@ class QualityRule(LintRule):
                             LintIssue(
                                 rule=self.name,
                                 severity="warning",
-                                message=(
-                                    f"Step {step.number} {field_name} is very short; "
-                                    "please be more descriptive"
-                                ),
+                                message=(f"Step {step.number} {field_name} is very short; please be more descriptive"),
                                 entity_id=entity.id,
                                 field=f"steps[{step.number}].{field_name}",
                             )

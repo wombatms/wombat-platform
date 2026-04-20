@@ -9,9 +9,7 @@ from wombat_core.models import SharedStep, TestCase
 
 class RequiredFieldsRule(LintRule):
     name = "required_fields"
-    description = (
-        "Warn when recommended fields are absent or when required string fields are blank."
-    )
+    description = "Warn when recommended fields are absent or when required string fields are blank."
 
     def check(self, entity: WombatEntity, config: WombatConfig) -> list[LintIssue]:
         issues: list[LintIssue] = []

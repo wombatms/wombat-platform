@@ -179,11 +179,7 @@ class TestAmbiguousLanguageRule:
     cfg = _config()
 
     def test_clean_steps(self):
-        tc = _tc(
-            steps=[
-                Step(number=1, action="Click the Login button", expected="Dashboard appears")
-            ]
-        )
+        tc = _tc(steps=[Step(number=1, action="Click the Login button", expected="Dashboard appears")])
         assert self.rule.check(tc, self.cfg) == []
 
     def test_vague_action(self):
@@ -218,9 +214,7 @@ class TestAmbiguousLanguageRule:
         assert any(i.field in ("title", "summary") for i in issues)
 
     def test_shared_step_vague(self):
-        ss = _ss(
-            steps=[Step(number=1, action="Maybe click login", expected="Form appears")]
-        )
+        ss = _ss(steps=[Step(number=1, action="Maybe click login", expected="Form appears")])
         issues = self.rule.check(ss, self.cfg)
         assert len(issues) > 0
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import httpx
 
-
 _MODEL_DIMS = {
     "text-embedding-3-small": 1536,
     "text-embedding-3-large": 3072,

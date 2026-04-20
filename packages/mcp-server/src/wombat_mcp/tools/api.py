@@ -40,10 +40,10 @@ import os
 import httpx
 import mcp.types as types
 
-
 # ---------------------------------------------------------------------------
 # Shared client factory
 # ---------------------------------------------------------------------------
+
 
 def _client() -> httpx.AsyncClient:
     base_url = os.environ.get("WOMBAT_API_URL", "http://localhost:8000")
@@ -73,6 +73,7 @@ _ENTITY_GET_PROPS = {
     "wombat_id": {"type": "string", "description": "WombatID of the entity."},
 }
 
+
 def _list_tool(name: str, plural: str, description: str) -> types.Tool:
     return types.Tool(
         name=name,
@@ -83,6 +84,7 @@ def _list_tool(name: str, plural: str, description: str) -> types.Tool:
             "required": ["project"],
         },
     )
+
 
 def _get_tool(name: str, singular: str, description: str) -> types.Tool:
     return types.Tool(
@@ -300,6 +302,7 @@ _TOOLS: list[types.Tool] = [
 # Handlers
 # ---------------------------------------------------------------------------
 
+
 async def _entity_list(project: str, endpoint: str, args: dict) -> dict:
     params: dict[str, object] = {
         "limit": args.get("limit", 50),
@@ -392,6 +395,7 @@ async def _sync(args: dict) -> dict:
 
 async def _import_file(args: dict) -> dict:
     import pathlib
+
     file_path = pathlib.Path(args["file_path"])
     profile = args.get("profile", "default")
     async with _client() as c:
@@ -470,6 +474,7 @@ async def _list_sources(args: dict) -> dict:
 # Dispatch table
 # ---------------------------------------------------------------------------
 
+
 async def _dispatch(name: str, args: dict) -> object:
     dispatch: dict[str, object] = {
         "api:testcases.list": lambda a: _handle_list("testcases", a),
@@ -502,6 +507,7 @@ async def _dispatch(name: str, args: dict) -> object:
 # ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
+
 
 def register_api_tools(registry) -> None:  # noqa: ANN001
     """Register all API-backed tools into *registry*."""

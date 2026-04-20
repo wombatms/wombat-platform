@@ -11,8 +11,7 @@ from __future__ import annotations
 PROMPTS: dict[str, dict] = {
     "create-regression-tests": {
         "description": (
-            "Generate formal regression test cases for a feature or bug fix, "
-            "avoiding duplication with existing tests."
+            "Generate formal regression test cases for a feature or bug fix, avoiding duplication with existing tests."
         ),
         "arguments": [
             {
@@ -70,7 +69,6 @@ Use `local:lint` and `local:validate` to check the new files before committing.
 Begin by searching for existing tests now.
 """,
     },
-
     "review-test-changes": {
         "description": (
             "Review a set of changed test case files and provide structured feedback "
@@ -134,7 +132,6 @@ Provide a structured review with:
 Begin reviewing now.
 """,
     },
-
     "suggest-missing-tests": {
         "description": (
             "Analyse a story or feature specification and suggest test cases that "
@@ -196,7 +193,6 @@ using the `create-regression-tests` prompt.
 Begin the analysis now.
 """,
     },
-
     "convert-to-formal-cases": {
         "description": (
             "Convert informal test notes, exploratory session logs, or acceptance "
@@ -268,7 +264,6 @@ Pipe the output through `local:validate` and `local:lint` after saving the files
 Begin conversion now.
 """,
     },
-
     "summarize-run-results": {
         "description": (
             "Fetch a test run and produce a concise human-readable summary with "

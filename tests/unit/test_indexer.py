@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from wombat_api.database.repository import Repository, content_hash_for
-from wombat_api.sync.indexer import Indexer, IndexerProgress
+from wombat_api.database.repository import Repository
+from wombat_api.sync.indexer import Indexer
 
 
 class _FakeEmbedder:
@@ -17,10 +17,13 @@ class _FakeEmbedder:
     Dimension must match the pgvector Vector(EMBED_DIM) column, which enforces
     the configured dim even under SQLite (the shim validates before writing).
     """
+
     name = "fake"
     dim = 384
+
     async def embed_batch(self, texts):
         from wombat_api.database.models import EMBED_DIM
+
         return [[float(len(t))] + [0.0] * (EMBED_DIM - 1) for t in texts]
 
 
@@ -34,6 +37,7 @@ async def session():
     but basic CRUD (used by the indexer) is fine.
     """
     from wombat_api.database.engine import Base
+
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -46,15 +50,13 @@ async def session():
 async def test_indexer_indexes_new_files(tmp_path: Path, session):
     (tmp_path / "testcases").mkdir()
     f = tmp_path / "testcases/tc-1.md"
-    f.write_text(
-        "---\nid: TC-AUTH-001\ntitle: T1\ntags: [auth]\ncomponent: auth\nowner: qa\n---\n\nSummary.\n"
-    )
+    f.write_text("---\nid: TC-AUTH-001\ntitle: T1\ntags: [auth]\ncomponent: auth\nowner: qa\n---\n\nSummary.\n")
     repo = Repository(session)
     project_id = uuid.uuid4()
     # seed project
     from wombat_api.database.models import ProjectDB
-    session.add(ProjectDB(id=project_id, slug="p", name="P",
-                         taxonomy_components=[], taxonomy_environments=[]))
+
+    session.add(ProjectDB(id=project_id, slug="p", name="P", taxonomy_components=[], taxonomy_environments=[]))
     await session.flush()
 
     idx = Indexer(
@@ -86,10 +88,10 @@ async def test_indexer_skips_unchanged_content(tmp_path: Path, session):
         "---\nid: TC-AUTH-001\ntitle: T1\ncomponent: auth\nowner: qa\n---\n\nSame.\n"
     )
     from wombat_api.database.models import ProjectDB
+
     repo = Repository(session)
     project_id = uuid.uuid4()
-    session.add(ProjectDB(id=project_id, slug="p", name="P",
-                         taxonomy_components=[], taxonomy_environments=[]))
+    session.add(ProjectDB(id=project_id, slug="p", name="P", taxonomy_components=[], taxonomy_environments=[]))
     await session.flush()
 
     embedder = _FakeEmbedder()
@@ -103,8 +105,11 @@ async def test_indexer_skips_unchanged_content(tmp_path: Path, session):
     embedder.embed_batch = counting  # type: ignore
 
     idx = Indexer(
-        repository=repo, embedder=embedder, batch_size=10,
-        chunk_size_tokens=500, chunk_overlap_tokens=50,
+        repository=repo,
+        embedder=embedder,
+        batch_size=10,
+        chunk_size_tokens=500,
+        chunk_overlap_tokens=50,
     )
     await idx.sync_project(project_id, tmp_path, tmp_path / ".w", [], None)
     first_calls = call_count["n"]

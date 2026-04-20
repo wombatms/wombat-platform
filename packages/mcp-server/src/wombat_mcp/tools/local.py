@@ -18,7 +18,6 @@ from pathlib import Path
 
 import mcp.types as types
 
-
 # ---------------------------------------------------------------------------
 # Tool definitions (JSON Schema input schemas)
 # ---------------------------------------------------------------------------
@@ -153,6 +152,7 @@ _DIFF_TOOL = types.Tool(
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _entity_to_dict(entity) -> dict:  # noqa: ANN001
     """Convert a WombatEntity to a plain dict for JSON serialisation."""
     try:
@@ -160,6 +160,7 @@ def _entity_to_dict(entity) -> dict:  # noqa: ANN001
     except AttributeError:
         # Fallback for entities that don't use pydantic v2 model_dump
         import dataclasses
+
         if dataclasses.is_dataclass(entity):
             return dataclasses.asdict(entity)
         return vars(entity)
@@ -173,6 +174,7 @@ def _repo_path() -> str | None:
 # Tool handlers
 # ---------------------------------------------------------------------------
 
+
 async def _lint(args: dict) -> dict:
     from wombat_core.config.loader import load_config
     from wombat_core.linting import LintEngine
@@ -185,6 +187,7 @@ async def _lint(args: dict) -> dict:
         entities = result.entities
     else:
         from wombat_core.parsing import parse_markdown_file, parse_yaml_file
+
         suffix = path.suffix.lower()
         if suffix == ".md":
             pr = parse_markdown_file(path)
@@ -229,6 +232,7 @@ async def _validate(args: dict) -> dict:
         vr = validate_corpus(entities)
     else:
         from wombat_core.parsing import parse_markdown_file, parse_yaml_file
+
         suffix = path.suffix.lower()
         if suffix == ".md":
             pr = parse_markdown_file(path)
@@ -244,14 +248,8 @@ async def _validate(args: dict) -> dict:
     return {
         "valid": vr.valid,
         "entity_count": len(entities),
-        "errors": [
-            {"field": e.field, "message": e.message, "entity_id": e.entity_id}
-            for e in vr.errors
-        ],
-        "warnings": [
-            {"field": w.field, "message": w.message, "entity_id": w.entity_id}
-            for w in vr.warnings
-        ],
+        "errors": [{"field": e.field, "message": e.message, "entity_id": e.entity_id} for e in vr.errors],
+        "warnings": [{"field": w.field, "message": w.message, "entity_id": w.entity_id} for w in vr.warnings],
     }
 
 
@@ -362,10 +360,7 @@ async def _diff(args: dict) -> dict:
             )
         }
 
-    changed_fields = [
-        k for k in set(old_data) | set(new_data)
-        if old_data.get(k) != new_data.get(k)
-    ]
+    changed_fields = [k for k in set(old_data) | set(new_data) if old_data.get(k) != new_data.get(k)]
     return {
         "entity_id": entity_id,
         "old": old_data,
@@ -377,6 +372,7 @@ async def _diff(args: dict) -> dict:
 # ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
+
 
 def register_local_tools(registry) -> None:  # noqa: ANN001
     """Register all local file-based tools into *registry*."""

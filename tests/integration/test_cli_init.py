@@ -31,9 +31,7 @@ class TestInitCommand:
             assert (wombat_dir / subdir).is_dir(), f"Missing subdir: {subdir}"
 
     def test_init_with_project_id_and_name(self, runner: CliRunner, init_dir: Path):
-        result = runner.invoke(
-            app, ["init", str(init_dir), "--id", "my-project", "--name", "My Project"]
-        )
+        result = runner.invoke(app, ["init", str(init_dir), "--id", "my-project", "--name", "My Project"])
         assert result.exit_code == 0
         config_text = (init_dir / ".wombat" / "config.yaml").read_text()
         assert "my-project" in config_text
@@ -55,9 +53,7 @@ class TestInitCommand:
 
     def test_init_force_overwrites_existing(self, runner: CliRunner, init_dir: Path):
         runner.invoke(app, ["init", str(init_dir), "--id", "original"])
-        result = runner.invoke(
-            app, ["init", str(init_dir), "--id", "overwritten", "--force"]
-        )
+        result = runner.invoke(app, ["init", str(init_dir), "--id", "overwritten", "--force"])
         assert result.exit_code == 0
         config_text = (init_dir / ".wombat" / "config.yaml").read_text()
         assert "overwritten" in config_text

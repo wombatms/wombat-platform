@@ -7,6 +7,7 @@ from pathlib import Path
 
 def extract_pdf_text(path: Path | str) -> str:
     from pypdf import PdfReader
+
     reader = PdfReader(str(path))
     parts: list[str] = []
     for page in reader.pages:

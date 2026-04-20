@@ -37,15 +37,13 @@ class _FakeEmbedder:
 
     async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         from wombat_api.database.models import EMBED_DIM
+
         self._call_count += len(texts)
         return [[float(len(t) % 256) / 256.0] + [0.0] * (EMBED_DIM - 1) for t in texts]
 
 
 def _write_testcase(path: Path, wombat_id: str, title: str, body: str = "Summary.") -> None:
-    path.write_text(
-        f"---\nid: {wombat_id}\ntitle: {title}\n"
-        f"tags: [auth]\ncomponent: auth\nowner: qa\n---\n\n{body}\n"
-    )
+    path.write_text(f"---\nid: {wombat_id}\ntitle: {title}\ntags: [auth]\ncomponent: auth\nowner: qa\n---\n\n{body}\n")
 
 
 @pytest.fixture
@@ -118,6 +116,7 @@ async def test_first_sync_creates_and_embeds(
     repo_root_path = None
 
     import tempfile
+
     with tempfile.TemporaryDirectory() as tmp:
         rp = Path(tmp)
         tc_dir = rp / "testcases"
@@ -152,6 +151,7 @@ async def test_second_sync_skips_unchanged(
     embedder = _FakeEmbedder()
 
     import tempfile
+
     with tempfile.TemporaryDirectory() as tmp:
         rp = Path(tmp)
         tc_dir = rp / "testcases"
@@ -171,8 +171,7 @@ async def test_second_sync_skips_unchanged(
     assert p2.skipped == 2, f"Expected skipped=2, got {p2.skipped}"
     assert p2.embedded == 0, f"Expected embedded=0, got {p2.embedded} (zero re-embeds)"
     assert calls_after_second == calls_after_first, (
-        "Embedder was called during no-op sync! "
-        f"Extra calls: {calls_after_second - calls_after_first}"
+        f"Embedder was called during no-op sync! Extra calls: {calls_after_second - calls_after_first}"
     )
 
 
@@ -187,6 +186,7 @@ async def test_third_sync_updates_edited_file(
     embedder = _FakeEmbedder()
 
     import tempfile
+
     with tempfile.TemporaryDirectory() as tmp:
         rp = Path(tmp)
         tc_dir = rp / "testcases"
@@ -200,9 +200,7 @@ async def test_third_sync_updates_edited_file(
         # Get hash before edit
         factory = async_sessionmaker(async_engine, expire_on_commit=False)
         async with factory() as s:
-            rows = (await s.execute(
-                select(Content).where(Content.project_id == project.id)
-            )).scalars().all()
+            rows = (await s.execute(select(Content).where(Content.project_id == project.id))).scalars().all()
         hash_before = {r.wombat_id: r.content_hash for r in rows}
 
         # Edit one testcase (no colon in title — YAML-safe)
@@ -219,16 +217,12 @@ async def test_third_sync_updates_edited_file(
     # Verify content_hash changed for the edited row
     factory = async_sessionmaker(async_engine, expire_on_commit=False)
     async with factory() as s:
-        rows = (await s.execute(
-            select(Content).where(Content.project_id == project.id)
-        )).scalars().all()
+        rows = (await s.execute(select(Content).where(Content.project_id == project.id))).scalars().all()
     hash_after = {r.wombat_id: r.content_hash for r in rows}
     assert hash_after["TC-SYNC-001"] != hash_before["TC-SYNC-001"], (
         "Content hash should have changed after editing TC-SYNC-001"
     )
-    assert hash_after.get("TC-SYNC-002") == hash_before.get("TC-SYNC-002"), (
-        "TC-SYNC-002 should not have changed"
-    )
+    assert hash_after.get("TC-SYNC-002") == hash_before.get("TC-SYNC-002"), "TC-SYNC-002 should not have changed"
 
 
 @pytest.mark.asyncio
@@ -241,6 +235,7 @@ async def test_fourth_sync_soft_deletes_removed_file(
     project, slug = seeded_project
 
     import tempfile
+
     with tempfile.TemporaryDirectory() as tmp:
         rp = Path(tmp)
         tc_dir = rp / "testcases"
@@ -262,9 +257,7 @@ async def test_fourth_sync_soft_deletes_removed_file(
     # Check soft-delete
     factory = async_sessionmaker(async_engine, expire_on_commit=False)
     async with factory() as s:
-        all_rows = (await s.execute(
-            select(Content).where(Content.project_id == project.id)
-        )).scalars().all()
+        all_rows = (await s.execute(select(Content).where(Content.project_id == project.id))).scalars().all()
 
     active = [r for r in all_rows if r.deleted_at is None]
     deleted = [r for r in all_rows if r.deleted_at is not None]

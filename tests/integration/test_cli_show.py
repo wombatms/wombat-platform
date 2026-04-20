@@ -50,8 +50,10 @@ class TestShowCommand:
         result = runner.invoke(
             app,
             [
-                "show", "TC-AUTH-LOGIN-0001",
-                "--directory", str(populated_project),
+                "show",
+                "TC-AUTH-LOGIN-0001",
+                "--directory",
+                str(populated_project),
                 "--json",
                 "--summary",
             ],

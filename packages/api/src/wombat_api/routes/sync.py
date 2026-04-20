@@ -64,17 +64,19 @@ async def trigger_sync(
         app_repos=[AppRepoSource(**a) for a in req.app_repos],
         docs_folder=req.docs_folder,
     )
-    session.add(SyncLogDB(
-        project_id=project.id,
-        source_repo="test-repo",
-        revision="aggregate",
-        entities_created=progress.seen,
-        entities_updated=0,
-        entities_deleted=0,
-        entities_skipped=progress.skipped,
-        errors=progress.errors,
-        duration_ms=0,
-    ))
+    session.add(
+        SyncLogDB(
+            project_id=project.id,
+            source_repo="test-repo",
+            revision="aggregate",
+            entities_created=progress.seen,
+            entities_updated=0,
+            entities_deleted=0,
+            entities_skipped=progress.skipped,
+            errors=progress.errors,
+            duration_ms=0,
+        )
+    )
     await session.commit()
     return {
         "total": progress.total,
@@ -87,6 +89,7 @@ async def trigger_sync(
 # ---------------------------------------------------------------------------
 # List sources
 # ---------------------------------------------------------------------------
+
 
 @router.get("/{project_slug}/sources")
 async def list_sources(
@@ -111,6 +114,7 @@ async def list_sources(
         ]}
     """
     from sqlalchemy import func, select
+
     from wombat_api.database.models import Content
 
     q = (

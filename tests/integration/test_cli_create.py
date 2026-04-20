@@ -12,16 +12,18 @@ from .conftest import parse_json_output
 
 
 class TestCreateCommand:
-    def test_create_testcase_with_explicit_id(
-        self, runner: CliRunner, project_dir: Path
-    ):
+    def test_create_testcase_with_explicit_id(self, runner: CliRunner, project_dir: Path):
         result = runner.invoke(
             app,
             [
-                "create", "testcase",
-                "--id", "TC-AUTH-NEW-0001",
-                "--title", "New test case",
-                "--directory", str(project_dir),
+                "create",
+                "testcase",
+                "--id",
+                "TC-AUTH-NEW-0001",
+                "--title",
+                "New test case",
+                "--directory",
+                str(project_dir),
                 "--json",
             ],
         )
@@ -34,10 +36,14 @@ class TestCreateCommand:
         runner.invoke(
             app,
             [
-                "create", "testcase",
-                "--id", "TC-AUTH-FILE-0001",
-                "--title", "File write test",
-                "--directory", str(project_dir),
+                "create",
+                "testcase",
+                "--id",
+                "TC-AUTH-FILE-0001",
+                "--title",
+                "File write test",
+                "--directory",
+                str(project_dir),
             ],
         )
         tc_file = project_dir / ".wombat" / "testcases" / "TC-AUTH-FILE-0001.md"
@@ -47,10 +53,14 @@ class TestCreateCommand:
         result = runner.invoke(
             app,
             [
-                "create", "plan",
-                "--id", "PLAN-NEW-2026",
-                "--title", "New release plan",
-                "--directory", str(project_dir),
+                "create",
+                "plan",
+                "--id",
+                "PLAN-NEW-2026",
+                "--title",
+                "New release plan",
+                "--directory",
+                str(project_dir),
                 "--json",
             ],
         )
@@ -62,10 +72,14 @@ class TestCreateCommand:
         result = runner.invoke(
             app,
             [
-                "create", "story",
-                "--id", "STORY-NEW-FEATURE",
-                "--title", "New feature story",
-                "--directory", str(project_dir),
+                "create",
+                "story",
+                "--id",
+                "STORY-NEW-FEATURE",
+                "--title",
+                "New feature story",
+                "--directory",
+                str(project_dir),
                 "--json",
             ],
         )
@@ -78,9 +92,12 @@ class TestCreateCommand:
         result = runner.invoke(
             app,
             [
-                "create", "testcase",
-                "--title", "Auto-sequenced test case",
-                "--directory", str(project_dir),
+                "create",
+                "testcase",
+                "--title",
+                "Auto-sequenced test case",
+                "--directory",
+                str(project_dir),
                 "--json",
             ],
         )
@@ -92,10 +109,14 @@ class TestCreateCommand:
         result = runner.invoke(
             app,
             [
-                "create", "testcase",
-                "--id", "TC-AUTH-DRYRUN-0001",
-                "--title", "Dry run test",
-                "--directory", str(project_dir),
+                "create",
+                "testcase",
+                "--id",
+                "TC-AUTH-DRYRUN-0001",
+                "--title",
+                "Dry run test",
+                "--directory",
+                str(project_dir),
                 "--dry-run",
                 "--json",
             ],
@@ -111,10 +132,14 @@ class TestCreateCommand:
         result = runner.invoke(
             app,
             [
-                "create", "testcase",
-                "--id", "TC-AUTH-DR-0001",
-                "--title", "Dry run check",
-                "--directory", str(project_dir),
+                "create",
+                "testcase",
+                "--id",
+                "TC-AUTH-DR-0001",
+                "--title",
+                "Dry run check",
+                "--directory",
+                str(project_dir),
                 "--dry-run",
                 "--json",
             ],
@@ -127,9 +152,12 @@ class TestCreateCommand:
         result = runner.invoke(
             app,
             [
-                "create", "unknowntype",
-                "--id", "XX-001",
-                "--directory", str(project_dir),
+                "create",
+                "unknowntype",
+                "--id",
+                "XX-001",
+                "--directory",
+                str(project_dir),
             ],
         )
         assert result.exit_code != 0
@@ -138,9 +166,7 @@ class TestCreateCommand:
         # Create project with auto_sequence: false
         wombat_dir = tmp_path / ".wombat"
         wombat_dir.mkdir()
-        (wombat_dir / "config.yaml").write_text(
-            "project:\n  id: test\n  name: Test\nid:\n  auto_sequence: false\n"
-        )
+        (wombat_dir / "config.yaml").write_text("project:\n  id: test\n  name: Test\nid:\n  auto_sequence: false\n")
         for s in ["testcases", "shared-steps", "plans", "stories", "suites"]:
             (wombat_dir / s).mkdir()
 

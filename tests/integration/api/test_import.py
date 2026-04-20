@@ -54,7 +54,13 @@ async def test_import_preview_returns_entities(
 
     resp = await httpx_client.post(
         f"/api/projects/{slug}/imports/preview",
-        files={"file": ("test_import.xlsx", xlsx_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        files={
+            "file": (
+                "test_import.xlsx",
+                xlsx_bytes,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
         data={"profile": "default"},
         headers={"Authorization": f"Bearer {editor_token}"},
     )
@@ -80,7 +86,13 @@ async def test_import_execute_returns_zip(
 
     resp = await httpx_client.post(
         f"/api/projects/{slug}/imports/execute",
-        files={"file": ("test_import.xlsx", xlsx_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        files={
+            "file": (
+                "test_import.xlsx",
+                xlsx_bytes,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
         data={"profile": "default"},
         headers={"Authorization": f"Bearer {editor_token}"},
     )
@@ -103,7 +115,13 @@ async def test_import_execute_zip_contains_markdown(
 
     resp = await httpx_client.post(
         f"/api/projects/{slug}/imports/execute",
-        files={"file": ("test_import.xlsx", xlsx_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        files={
+            "file": (
+                "test_import.xlsx",
+                xlsx_bytes,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
         data={"profile": "default"},
         headers={"Authorization": f"Bearer {editor_token}"},
     )
@@ -173,6 +191,7 @@ async def test_import_csv_preview(
 ):
     """CSV upload to /imports/preview also works."""
     import csv
+
     project, slug = seeded_project
     editor_token = users["editor"]["token"]
 

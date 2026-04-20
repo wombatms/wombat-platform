@@ -29,6 +29,7 @@ _KIND_DISPLAY = {
 # Schema resources
 # ---------------------------------------------------------------------------
 
+
 def list_schema_resources() -> list[types.Resource]:
     return [
         types.Resource(
@@ -170,6 +171,7 @@ def _discover_templates() -> dict[str, str]:
     # Try to load the config to find the templates directory
     try:
         from wombat_core.config.loader import load_config
+
         config = load_config(repo_path)
         if config.config_path is not None:
             templates_dir = config.config_path.parent / config.templates.directory

@@ -28,7 +28,8 @@ class TestSearchCommand:
             [
                 "search",
                 "zzz-no-match-xyz",
-                "--directory", str(populated_project),
+                "--directory",
+                str(populated_project),
                 "--json",
             ],
         )
@@ -53,9 +54,12 @@ class TestSearchCommand:
         result = runner.invoke(
             app,
             [
-                "search", "auth",
-                "--directory", str(populated_project),
-                "--type", "testcase",
+                "search",
+                "auth",
+                "--directory",
+                str(populated_project),
+                "--type",
+                "testcase",
                 "--json",
             ],
         )
@@ -67,9 +71,12 @@ class TestSearchCommand:
         result = runner.invoke(
             app,
             [
-                "search", "a",  # broad query to match many
-                "--directory", str(populated_project),
-                "--limit", "1",
+                "search",
+                "a",  # broad query to match many
+                "--directory",
+                str(populated_project),
+                "--limit",
+                "1",
                 "--json",
             ],
         )

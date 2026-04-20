@@ -17,8 +17,8 @@ import mcp.types as types
 
 from wombat_mcp.resources.schemas import (
     list_schema_resources,
-    read_schema_resource,
     list_template_resources,
+    read_schema_resource,
     read_template_resource,
 )
 
@@ -63,10 +63,10 @@ async def read_wombat_resource(uri: str) -> str:
     if uri == "wombat://taxonomy":
         return _read_taxonomy()
     if uri.startswith("wombat://schemas/"):
-        kind = uri[len("wombat://schemas/"):]
+        kind = uri[len("wombat://schemas/") :]
         return read_schema_resource(kind)
     if uri.startswith("wombat://templates/"):
-        kind = uri[len("wombat://templates/"):]
+        kind = uri[len("wombat://templates/") :]
         return read_template_resource(kind)
     raise ValueError(f"Unknown wombat:// resource: {uri!r}")
 
@@ -75,14 +75,16 @@ async def read_wombat_resource(uri: str) -> str:
 # Config / taxonomy readers
 # ---------------------------------------------------------------------------
 
+
 def _repo_path() -> Path:
     """Return WOMBAT_REPO_PATH or cwd."""
     return Path(os.environ.get("WOMBAT_REPO_PATH", "."))
 
 
 def _read_config() -> str:
-    from wombat_core.config.loader import load_config
     import dataclasses
+
+    from wombat_core.config.loader import load_config
 
     config = load_config(_repo_path())
     # Convert the dataclass hierarchy to a plain dict for JSON serialisation
@@ -94,8 +96,9 @@ def _read_config() -> str:
 
 
 def _read_taxonomy() -> str:
-    from wombat_core.config.loader import load_config
     import dataclasses
+
+    from wombat_core.config.loader import load_config
 
     config = load_config(_repo_path())
     tax = config.taxonomy

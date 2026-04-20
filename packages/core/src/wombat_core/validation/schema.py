@@ -128,9 +128,7 @@ def _build_id_index(entities: list[WombatEntity]) -> dict[str, WombatEntity]:
     return {e.id: e for e in entities}
 
 
-def _check_reference_integrity(
-    entity: WombatEntity, id_index: dict[str, WombatEntity]
-) -> list[ValidationError]:
+def _check_reference_integrity(entity: WombatEntity, id_index: dict[str, WombatEntity]) -> list[ValidationError]:
     """Check that all referenced WombatIDs exist in the corpus."""
     errors: list[ValidationError] = []
 

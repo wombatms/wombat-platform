@@ -98,10 +98,7 @@ def list_command(
                 hint="Run `wombat init` first.",
             )
         else:
-            err_console.print(
-                "[red]Error:[/red] No .wombat/ directory found. "
-                "Run `wombat init` first."
-            )
+            err_console.print("[red]Error:[/red] No .wombat/ directory found. Run `wombat init` first.")
         raise typer.Exit(1)
 
     tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
@@ -121,15 +118,9 @@ def list_command(
     # Apply automation_status / review_state post-filter (not in search_files)
     entities = search_result.entities
     if automation_status:
-        entities = [
-            e for e in entities
-            if getattr(getattr(e, "automation", None), "status", None) == automation_status
-        ]
+        entities = [e for e in entities if getattr(getattr(e, "automation", None), "status", None) == automation_status]
     if review_state:
-        entities = [
-            e for e in entities
-            if getattr(getattr(e, "review", None), "state", None) == review_state
-        ]
+        entities = [e for e in entities if getattr(getattr(e, "review", None), "state", None) == review_state]
 
     data = [entity_to_dict(e) for e in entities]
     total = len(data)
@@ -145,12 +136,14 @@ def list_command(
         if ids_only:
             print_json([d.get("id") for d in data])
         else:
-            print_json({
-                "results": data,
-                "count": total,
-                "limit": limit,
-                "offset": offset,
-            })
+            print_json(
+                {
+                    "results": data,
+                    "count": total,
+                    "limit": limit,
+                    "offset": offset,
+                }
+            )
     else:
         print_entity_list(data, brief=brief, ids_only=ids_only)
 

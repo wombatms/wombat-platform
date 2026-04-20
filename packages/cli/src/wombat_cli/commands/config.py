@@ -42,10 +42,7 @@ def config_command(
                 hint="Run `wombat init` first.",
             )
         else:
-            err_console.print(
-                "[red]Error:[/red] No .wombat/config.yaml found. "
-                "Run `wombat init` first."
-            )
+            err_console.print("[red]Error:[/red] No .wombat/config.yaml found. Run `wombat init` first.")
         raise typer.Exit(1)
 
     # Handle --set key=value
@@ -63,6 +60,7 @@ def config_command(
             print_json({"set": set_key.strip(), "value": val.strip()})
         else:
             from wombat_cli.formatting.table_output import console
+
             console.print(f"[green]Set[/green] {set_key.strip()} = {val.strip()}")
         sys.exit(0)
 
@@ -81,6 +79,7 @@ def config_command(
             print_json({key: value})
         else:
             from wombat_cli.formatting.table_output import console
+
             console.print(f"{key} = {value}")
     else:
         if json_output:
@@ -132,6 +131,7 @@ def _write_config_value(config_path: Path, key: str, value: str) -> None:
     """Write a single key=value into config.yaml using ruamel.yaml or yaml."""
     try:
         import ruamel.yaml as _ry
+
         ryaml = _ry.YAML()
         ryaml.preserve_quotes = True
         with open(config_path) as f:

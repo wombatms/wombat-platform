@@ -16,9 +16,12 @@ class TestUpdateCommand:
         result = runner.invoke(
             app,
             [
-                "update", "TC-AUTH-LOGIN-0001",
-                "--set", "title=Updated login title",
-                "--directory", str(populated_project),
+                "update",
+                "TC-AUTH-LOGIN-0001",
+                "--set",
+                "title=Updated login title",
+                "--directory",
+                str(populated_project),
                 "--json",
             ],
         )
@@ -37,9 +40,12 @@ class TestUpdateCommand:
         result = runner.invoke(
             app,
             [
-                "update", "TC-AUTH-LOGIN-0001",
-                "--set", "priority=critical",
-                "--directory", str(populated_project),
+                "update",
+                "TC-AUTH-LOGIN-0001",
+                "--set",
+                "priority=critical",
+                "--directory",
+                str(populated_project),
                 "--json",
             ],
         )
@@ -51,9 +57,12 @@ class TestUpdateCommand:
         runner.invoke(
             app,
             [
-                "update", "TC-AUTH-LOGIN-0001",
-                "--set", "summary=Updated summary value",
-                "--directory", str(populated_project),
+                "update",
+                "TC-AUTH-LOGIN-0001",
+                "--set",
+                "summary=Updated summary value",
+                "--directory",
+                str(populated_project),
             ],
         )
         # Read back via show
@@ -68,10 +77,14 @@ class TestUpdateCommand:
         result = runner.invoke(
             app,
             [
-                "update", "TC-AUTH-LOGIN-0001",
-                "--set", "status=deprecated",
-                "--reason", "Superseded by new test",
-                "--directory", str(populated_project),
+                "update",
+                "TC-AUTH-LOGIN-0001",
+                "--set",
+                "status=deprecated",
+                "--reason",
+                "Superseded by new test",
+                "--directory",
+                str(populated_project),
                 "--json",
             ],
         )
@@ -83,9 +96,12 @@ class TestUpdateCommand:
         runner.invoke(
             app,
             [
-                "update", "TC-AUTH-LOGIN-0001",
-                "--set", "summary=Should not persist",
-                "--directory", str(populated_project),
+                "update",
+                "TC-AUTH-LOGIN-0001",
+                "--set",
+                "summary=Should not persist",
+                "--directory",
+                str(populated_project),
                 "--dry-run",
             ],
         )
@@ -101,9 +117,12 @@ class TestUpdateCommand:
         result = runner.invoke(
             app,
             [
-                "update", "TC-AUTH-LOGIN-0001",
-                "--set", "priority=low",
-                "--directory", str(populated_project),
+                "update",
+                "TC-AUTH-LOGIN-0001",
+                "--set",
+                "priority=low",
+                "--directory",
+                str(populated_project),
                 "--dry-run",
                 "--json",
             ],
@@ -113,28 +132,30 @@ class TestUpdateCommand:
         assert data["dry_run"] is True
         assert "entity" in data
 
-    def test_update_nonexistent_entity_exits_3(
-        self, runner: CliRunner, populated_project: Path
-    ):
+    def test_update_nonexistent_entity_exits_3(self, runner: CliRunner, populated_project: Path):
         result = runner.invoke(
             app,
             [
-                "update", "TC-NONEXISTENT-9999",
-                "--set", "title=Whatever",
-                "--directory", str(populated_project),
+                "update",
+                "TC-NONEXISTENT-9999",
+                "--set",
+                "title=Whatever",
+                "--directory",
+                str(populated_project),
             ],
         )
         assert result.exit_code == 3
 
-    def test_update_invalid_set_expression(
-        self, runner: CliRunner, populated_project: Path
-    ):
+    def test_update_invalid_set_expression(self, runner: CliRunner, populated_project: Path):
         result = runner.invoke(
             app,
             [
-                "update", "TC-AUTH-LOGIN-0001",
-                "--set", "no-equals-sign",
-                "--directory", str(populated_project),
+                "update",
+                "TC-AUTH-LOGIN-0001",
+                "--set",
+                "no-equals-sign",
+                "--directory",
+                str(populated_project),
             ],
         )
         assert result.exit_code != 0
@@ -146,15 +167,16 @@ class TestUpdateCommand:
         )
         assert result.exit_code == 1
 
-    def test_update_json_response_has_path(
-        self, runner: CliRunner, populated_project: Path
-    ):
+    def test_update_json_response_has_path(self, runner: CliRunner, populated_project: Path):
         result = runner.invoke(
             app,
             [
-                "update", "TC-AUTH-LOGIN-0001",
-                "--set", "priority=high",
-                "--directory", str(populated_project),
+                "update",
+                "TC-AUTH-LOGIN-0001",
+                "--set",
+                "priority=high",
+                "--directory",
+                str(populated_project),
                 "--json",
             ],
         )

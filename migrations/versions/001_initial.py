@@ -8,22 +8,21 @@ Create Date: 2026-04-20
 
 from __future__ import annotations
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
 from pgvector.sqlalchemy import Vector
 from sqlalchemy.dialects import postgresql
-
 from wombat_api.config import get_config
 
 EMBED_DIM = get_config().embed_dim
 
 # revision identifiers, used by Alembic.
 revision: str = "001_initial"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -178,9 +177,7 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.func.now(),
         ),
-        sa.UniqueConstraint(
-            "project_id", "kind", "wombat_id", name="uq_content_kind_wid"
-        ),
+        sa.UniqueConstraint("project_id", "kind", "wombat_id", name="uq_content_kind_wid"),
         sa.UniqueConstraint(
             "project_id",
             "source_repo",
@@ -188,9 +185,7 @@ def upgrade() -> None:
             name="uq_content_path",
         ),
     )
-    op.create_index(
-        "ix_content_project_kind", "content", ["project_id", "kind"]
-    )
+    op.create_index("ix_content_project_kind", "content", ["project_id", "kind"])
 
     # ---- content_chunks ----
     op.create_table(
@@ -205,9 +200,7 @@ def upgrade() -> None:
         sa.Column("chunk_index", sa.Integer(), nullable=False),
         sa.Column("text", sa.String(), nullable=False),
         sa.Column("embedding", Vector(EMBED_DIM), nullable=True),
-        sa.UniqueConstraint(
-            "content_id", "chunk_index", name="uq_chunk_idx"
-        ),
+        sa.UniqueConstraint("content_id", "chunk_index", name="uq_chunk_idx"),
     )
 
     # ---- runs ----
@@ -238,9 +231,7 @@ def upgrade() -> None:
             server_default=sa.text("'[]'::jsonb"),
         ),
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column(
-            "completed_at", sa.DateTime(timezone=True), nullable=True
-        ),
+        sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -293,9 +284,7 @@ def upgrade() -> None:
             postgresql.JSONB(astext_type=sa.Text()),
             nullable=True,
         ),
-        sa.Column(
-            "executed_at", sa.DateTime(timezone=True), nullable=False
-        ),
+        sa.Column("executed_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -391,9 +380,7 @@ def upgrade() -> None:
 
     # ---- Vector IVFFlat indexes (cosine). ----
     op.execute(
-        "CREATE INDEX ix_content_embedding "
-        "ON content USING ivfflat (embedding vector_cosine_ops) "
-        "WITH (lists = 100)"
+        "CREATE INDEX ix_content_embedding ON content USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100)"
     )
     op.execute(
         "CREATE INDEX ix_chunks_embedding "

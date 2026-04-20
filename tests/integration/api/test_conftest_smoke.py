@@ -25,14 +25,10 @@ async def test_all_three_user_tokens_authenticate(httpx_client, users):
             "/api/auth/me",
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert resp.status_code == 200, (
-            f"Role '{role_name}' got {resp.status_code}: {resp.text}"
-        )
+        assert resp.status_code == 200, f"Role '{role_name}' got {resp.status_code}: {resp.text}"
         body = resp.json()
         assert "id" in body, f"Missing 'id' in /me response for role '{role_name}'"
-        assert body["email"] == data["user"].email, (
-            f"Email mismatch for role '{role_name}'"
-        )
+        assert body["email"] == data["user"].email, f"Email mismatch for role '{role_name}'"
 
 
 @pytest.mark.asyncio
@@ -46,6 +42,7 @@ async def test_unauthenticated_me_returns_401(httpx_client):
 async def test_seeded_project_in_db(db_session, seeded_project):
     """seeded_project fixture must create a queryable project row."""
     from sqlalchemy import select
+
     from wombat_api.database.models import ProjectDB
 
     project, slug = seeded_project

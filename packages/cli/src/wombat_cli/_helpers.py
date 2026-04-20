@@ -126,7 +126,7 @@ def next_sequence_id(root: Path, entity_type: str) -> str:
     existing_nums: list[int] = []
     for e in entities:
         if e.id.startswith(f"{prefix}-"):
-            suffix = e.id[len(prefix) + 1:]
+            suffix = e.id[len(prefix) + 1 :]
             if suffix.isdigit():
                 existing_nums.append(int(suffix))
     next_num = max(existing_nums, default=0) + 1

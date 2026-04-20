@@ -57,10 +57,7 @@ def update_command(
                 hint="Run `wombat init` first.",
             )
         else:
-            err_console.print(
-                "[red]Error:[/red] No .wombat/ directory found. "
-                "Run `wombat init` first."
-            )
+            err_console.print("[red]Error:[/red] No .wombat/ directory found. Run `wombat init` first.")
         raise typer.Exit(1)
 
     entity = find_by_id(root, entity_id)
@@ -100,13 +97,16 @@ def update_command(
 
     if dry_run:
         if json_output:
-            print_json({
-                "entity": entity_to_dict(updated),
-                "version": new_version,
-                "dry_run": True,
-            })
+            print_json(
+                {
+                    "entity": entity_to_dict(updated),
+                    "version": new_version,
+                    "dry_run": True,
+                }
+            )
         else:
             from wombat_cli.formatting.table_output import console
+
             console.print("[dim](dry-run — not written)[/dim]")
             console.print(content)
         sys.exit(0)
@@ -122,18 +122,18 @@ def update_command(
     write_entity(updated, file_path)
 
     if json_output:
-        print_json({
-            "entity": entity_to_dict(updated),
-            "path": str(file_path),
-            "version": new_version,
-            "written": True,
-        })
+        print_json(
+            {
+                "entity": entity_to_dict(updated),
+                "path": str(file_path),
+                "version": new_version,
+                "written": True,
+            }
+        )
     else:
         from wombat_cli.formatting.table_output import console
-        console.print(
-            f"[green]Updated[/green] [bold]{entity_id}[/bold] "
-            f"→ version {new_version} ({file_path})"
-        )
+
+        console.print(f"[green]Updated[/green] [bold]{entity_id}[/bold] → version {new_version} ({file_path})")
 
     sys.exit(0)
 

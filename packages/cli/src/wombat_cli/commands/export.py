@@ -44,10 +44,7 @@ def export_command(
         fmt = "json"
 
     if fmt not in _FORMATS:
-        err_console.print(
-            f"[red]Error:[/red] Unknown format {fmt!r}. "
-            f"Choose from: {', '.join(_FORMATS)}"
-        )
+        err_console.print(f"[red]Error:[/red] Unknown format {fmt!r}. Choose from: {', '.join(_FORMATS)}")
         raise typer.Exit(1)
 
     from wombat_cli._helpers import wombat_root
@@ -80,6 +77,7 @@ def export_command(
     if output:
         output.write_text(content, encoding="utf-8")
         from wombat_cli.formatting.table_output import console
+
         console.print(f"[green]Exported {len(entities)} entities[/green] → {output}")
     else:
         print(content)
@@ -91,10 +89,12 @@ def _render(entities, fmt: str, entity_to_dict, serialise_entity) -> str:  # noq
     """Render a list of entities as the requested format string."""
     if fmt == "json":
         import json as _json
+
         return _json.dumps([entity_to_dict(e) for e in entities], indent=2)
 
     if fmt == "yaml":
         import yaml
+
         return yaml.safe_dump(
             [entity_to_dict(e) for e in entities],
             allow_unicode=True,
@@ -109,9 +109,7 @@ def _render(entities, fmt: str, entity_to_dict, serialise_entity) -> str:  # noq
         dicts = [entity_to_dict(e) for e in entities]
         if not dicts:
             return ""
-        all_keys: list[str] = list(
-            {k for d in dicts for k in d if not isinstance(d[k], (list, dict))}
-        )
+        all_keys: list[str] = list({k for d in dicts for k in d if not isinstance(d[k], (list, dict))})
         writer = csv.DictWriter(
             buf,
             fieldnames=all_keys,

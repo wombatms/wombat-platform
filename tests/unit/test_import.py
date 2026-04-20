@@ -16,18 +16,15 @@ Covers:
 from __future__ import annotations
 
 import csv
-import io
 import uuid
 from pathlib import Path
 
 import pytest
 
-from wombat_core.importing import parse_file, ImportResult
-from wombat_core.importing.mapping import MappingProfile, ColumnMapping, load_profile
-from wombat_core.importing.parser import parse_xlsx, parse_csv
-from wombat_core.importing.transformer import transform_rows
+from wombat_core.importing import ImportResult, parse_file
+from wombat_core.importing.mapping import load_profile
+from wombat_core.importing.parser import parse_csv, parse_xlsx
 from wombat_core.models.testcase import TestCase
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -61,7 +58,16 @@ def _csv_path(tmp_path: Path, rows: list[list], headers: list[str] | None = None
 
 
 _STANDARD_HEADERS = ["id", "title", "component", "owner", "tags", "summary", "priority", "status"]
-_STANDARD_ROW = ["TC-TEST-0001", "Login test", "auth", "qa-team", "smoke,regression", "Basic login flow", "high", "active"]
+_STANDARD_ROW = [
+    "TC-TEST-0001",
+    "Login test",
+    "auth",
+    "qa-team",
+    "smoke,regression",
+    "Basic login flow",
+    "high",
+    "active",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -93,6 +99,7 @@ class TestParseXLSX:
 
     def test_skips_all_none_rows(self, tmp_path):
         import openpyxl
+
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.append(_STANDARD_HEADERS)
@@ -257,13 +264,26 @@ class TestDryRun:
 
 class TestAzureDevOpsProfile:
     _ADO_HEADERS = [
-        "ID", "Title", "Area Path", "Assigned To", "Tags",
-        "Description", "Priority", "State", "Test Type",
+        "ID",
+        "Title",
+        "Area Path",
+        "Assigned To",
+        "Tags",
+        "Description",
+        "Priority",
+        "State",
+        "Test Type",
     ]
     _ADO_ROW = [
-        "12345", "Refund flow", "MyProject\\Payments\\Checkout",
-        "alice@example.com", "regression, smoke",
-        "Verify refund", "2", "Active", "Functional",
+        "12345",
+        "Refund flow",
+        "MyProject\\Payments\\Checkout",
+        "alice@example.com",
+        "regression, smoke",
+        "Verify refund",
+        "2",
+        "Active",
+        "Functional",
     ]
 
     def test_ado_profile_loads(self):
@@ -358,9 +378,7 @@ class TestXLSXFormulaHandling:
         ws.append(_STANDARD_HEADERS)
         # Write a row where the summary cell contains a plain string that could
         # look like a formula result – we verify it comes through unchanged.
-        row_with_formula_style = [
-            "TC-FRM-001", "Formula title", "auth", "qa", "", "=CONCATENATE()", "high", "active"
-        ]
+        row_with_formula_style = ["TC-FRM-001", "Formula title", "auth", "qa", "", "=CONCATENATE()", "high", "active"]
         ws.append(row_with_formula_style)
         dest = tmp_path / "formula_test.xlsx"
         wb.save(dest)

@@ -36,10 +36,12 @@ def build_tool_registry(mode: str) -> ToolRegistry:
 
     if mode in ("local", "both"):
         from wombat_mcp.tools.local import register_local_tools
+
         register_local_tools(registry)
 
     if mode in ("api", "both"):
         from wombat_mcp.tools.api import register_api_tools
+
         register_api_tools(registry)
 
     return registry

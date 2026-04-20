@@ -160,7 +160,10 @@ def print_summary(entity: dict[str, Any]) -> None:
     summary_fields = {
         k: v
         for k, v in entity.items()
-        if v is not None and v != "" and v != [] and v != {}
+        if v is not None
+        and v != ""
+        and v != []
+        and v != {}
         and k not in ("body", "steps", "preconditions", "test_data")
     }
     # Add step count if steps present

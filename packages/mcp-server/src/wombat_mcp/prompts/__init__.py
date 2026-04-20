@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import mcp.types as types
+
 from wombat_mcp.prompts.templates import PROMPTS, render_prompt
 
 
@@ -25,9 +26,7 @@ def list_wombat_prompts() -> list[types.Prompt]:
     ]
 
 
-async def get_wombat_prompt(
-    name: str, arguments: dict[str, str]
-) -> types.GetPromptResult:
+async def get_wombat_prompt(name: str, arguments: dict[str, str]) -> types.GetPromptResult:
     """Render a prompt by name, substituting *arguments* into the template."""
     if name not in PROMPTS:
         raise ValueError(f"Unknown prompt: {name!r}")

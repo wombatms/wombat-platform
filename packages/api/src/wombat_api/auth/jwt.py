@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 import jwt
@@ -28,7 +28,7 @@ def create_access_token(
     """Encode a signed JWT access token."""
     cfg = get_config()
     minutes = expires_minutes if expires_minutes is not None else cfg.jwt_access_minutes
-    exp = datetime.now(timezone.utc) + timedelta(minutes=minutes)
+    exp = datetime.now(UTC) + timedelta(minutes=minutes)
     payload = {
         "sub": str(user_id),
         "email": email,
@@ -45,7 +45,7 @@ def create_refresh_token(
     """Encode a signed JWT refresh token (no email claim)."""
     cfg = get_config()
     days = expires_days if expires_days is not None else cfg.jwt_refresh_days
-    exp = datetime.now(timezone.utc) + timedelta(days=days)
+    exp = datetime.now(UTC) + timedelta(days=days)
     payload = {
         "sub": str(user_id),
         "token_type": "refresh",
@@ -66,5 +66,5 @@ def decode_token(token: str) -> TokenPayload:
         user_id=uuid.UUID(data["sub"]),
         email=data.get("email"),
         token_type=data["token_type"],
-        exp=datetime.fromtimestamp(data["exp"], tz=timezone.utc),
+        exp=datetime.fromtimestamp(data["exp"], tz=UTC),
     )

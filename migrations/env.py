@@ -14,10 +14,10 @@ from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
+from wombat_api.database import models  # noqa: F401 -- registers tables on Base
 
 # Import Base and all models so Alembic autogenerate detects every table.
 from wombat_api.database.engine import Base
-from wombat_api.database import models  # noqa: F401 -- registers tables on Base
 
 # This is the Alembic Config object, which provides access to values within
 # the .ini file in use.

@@ -11,10 +11,10 @@ from pydantic import BaseModel
 
 
 class AppRepoSource(BaseModel):
-    name: str                  # "my-service"
-    repo: str                  # git URL
+    name: str  # "my-service"
+    repo: str  # git URL
     ref: str = "main"
-    include: list[str] = []    # glob patterns
+    include: list[str] = []  # glob patterns
 
 
 class RagSourcesConfig(BaseModel):
