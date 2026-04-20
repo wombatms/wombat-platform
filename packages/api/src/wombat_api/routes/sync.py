@@ -1,4 +1,8 @@
-"""Sync route — POST /{project_slug}/sync triggers the indexer pipeline."""
+"""Sync route — POST /{project_slug}/sync triggers the indexer pipeline.
+
+Also exposes:
+- GET  /{project_slug}/sources   — list indexed source repos with freshness info
+"""
 
 from __future__ import annotations
 
@@ -78,3 +82,57 @@ async def trigger_sync(
         "skipped": progress.skipped,
         "errors": len(progress.errors),
     }
+
+
+# ---------------------------------------------------------------------------
+# List sources
+# ---------------------------------------------------------------------------
+
+@router.get("/{project_slug}/sources")
+async def list_sources(
+    project_slug: str,
+    project: ProjectDB = Depends(require_role(Role.viewer)),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Return distinct source repos with last synced revision and timestamp.
+
+    Aggregates ``source_repo``, ``MAX(source_revision)``, and ``MAX(synced_at)``
+    from the ``content`` table for the given project.
+
+    Response shape::
+
+        {"sources": [
+            {
+                "source_repo": "...",
+                "last_synced_revision": "...",
+                "last_synced_at": "ISO-8601 timestamp"
+            },
+            ...
+        ]}
+    """
+    from sqlalchemy import func, select
+    from wombat_api.database.models import Content
+
+    q = (
+        select(
+            Content.source_repo,
+            func.max(Content.source_revision).label("last_synced_revision"),
+            func.max(Content.synced_at).label("last_synced_at"),
+        )
+        .where(
+            Content.project_id == project.id,
+            Content.deleted_at.is_(None),
+        )
+        .group_by(Content.source_repo)
+        .order_by(Content.source_repo)
+    )
+    rows = (await session.execute(q)).all()
+    sources = [
+        {
+            "source_repo": r.source_repo,
+            "last_synced_revision": r.last_synced_revision,
+            "last_synced_at": r.last_synced_at.isoformat() if r.last_synced_at else None,
+        }
+        for r in rows
+    ]
+    return {"sources": sources}

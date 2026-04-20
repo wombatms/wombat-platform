@@ -60,11 +60,12 @@ def _assert_embedder_dim_matches() -> None:
 def _register_routes(app: FastAPI) -> None:
     from wombat_api.routes import (  # noqa: F401
         auth, projects, testcases, shared_steps, plans, stories, suites,
-        runs, sync, imports, audit, search,
+        runs, sync, imports, audit, search, content,
     )
     app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
     app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
     app.include_router(search.router, prefix="/api/projects", tags=["search"])
+    app.include_router(content.router, prefix="/api/projects", tags=["content"])
     app.include_router(testcases.router, prefix="/api/projects", tags=["content"])
     app.include_router(shared_steps.router, prefix="/api/projects", tags=["content"])
     app.include_router(plans.router, prefix="/api/projects", tags=["content"])
