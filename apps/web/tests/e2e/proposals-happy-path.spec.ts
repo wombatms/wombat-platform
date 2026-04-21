@@ -34,7 +34,7 @@ test.describe("Proposals happy-path flow", () => {
     );
 
     // Wait for the form to load
-    await expect(page.getByPlaceholderText(/content title/i)).toBeVisible({
+    await expect(page.getByPlaceholder(/content title/i)).toBeVisible({
       timeout: 15_000,
     });
 
@@ -42,10 +42,10 @@ test.describe("Proposals happy-path flow", () => {
     await axeScan(page);
 
     // ----- Step 2: Fill in a new title and submit -----
-    const titleInput = page.getByPlaceholderText(/content title/i);
+    const titleInput = page.getByPlaceholder(/content title/i);
     await titleInput.fill(PROPOSAL_TITLE);
 
-    const summaryInput = page.getByPlaceholderText(/brief description/i);
+    const summaryInput = page.getByPlaceholder(/brief description/i);
     await summaryInput.fill("Happy-path E2E test proposal");
 
     // Click "Propose change" (not "Publish directly")

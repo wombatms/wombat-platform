@@ -99,7 +99,7 @@ async def test_cross_user_approve_succeeds(
     # Create a second admin user (admin B).
     from wombat_api.auth.jwt import create_access_token
     from wombat_api.auth.passwords import hash_password
-    from wombat_api.database.models import UserDB, UserProjectRoleDB
+    from wombat_api.database.models import UserDB
 
     admin_a_user = users["admin"]["user"]
     admin_a_token = users["admin"]["token"]

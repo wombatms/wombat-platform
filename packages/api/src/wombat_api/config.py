@@ -42,7 +42,5 @@ def get_config() -> Config:
         embedder_model=os.environ.get("WOMBAT_EMBEDDER_MODEL", "bge-small-en-v1.5"),
         openai_api_key=os.environ.get("OPENAI_API_KEY"),
         sources_root=os.environ.get("WOMBAT_SOURCES_ROOT", ".wombat/sources"),
-        git_workspace_root=os.environ.get(
-            "WOMBAT_GIT_WORKSPACE_ROOT", ".wombat/workspace"
-        ),
+        git_workspace_root=os.environ.get("WOMBAT_GIT_WORKSPACE_ROOT", ".wombat/workspace"),
     )

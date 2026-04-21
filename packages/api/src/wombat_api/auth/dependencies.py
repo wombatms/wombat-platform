@@ -14,8 +14,8 @@ from wombat_api.auth.jwt import decode_token
 from wombat_api.database.engine import get_session
 from wombat_api.database.models import APITokenDB, UserDB
 from wombat_api.database.repository import Repository
-from wombat_api.rbac.permissions import Permission, role_permissions
 from wombat_api.rbac.models import Role
+from wombat_api.rbac.permissions import Permission, role_permissions
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 

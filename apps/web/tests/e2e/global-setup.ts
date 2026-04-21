@@ -44,7 +44,14 @@ import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
 import { execSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
+
+import { seedDemoContent } from "./seed";
+
+// Shim __dirname for ESM — apps/web uses "type": "module".
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const API_BASE = process.env.WOMBAT_API_URL ?? "http://localhost:8000";
 const APP_BASE = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:5173";
@@ -215,6 +222,14 @@ export default async function globalSetup() {
     } else {
       console.log("[setup] Seed project already exists — reusing.");
     }
+  }
+
+  // 3b. Seed demo content so specs can reference TC-AUTH-001, SS-NAV-001, etc.
+  //     Idempotent: individual create calls tolerate 409 (already exists).
+  try {
+    await seedDemoContent(accessToken);
+  } catch (e) {
+    console.warn("[setup] Content seeding warning (non-fatal):", String(e));
   }
 
   // 4. Provision a temp bare Git remote for proposal E2E flows (SP3.2)

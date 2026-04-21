@@ -38,6 +38,7 @@ def _project_out(p: ProjectDB) -> dict:
         "default_owner": p.default_owner,
         "taxonomy_components": p.taxonomy_components,
         "taxonomy_environments": p.taxonomy_environments,
+        "git_url": p.git_url,
         "created_at": p.created_at.isoformat(),
     }
 
@@ -109,7 +110,16 @@ async def update_project(
 
     Only fields present in the body are updated.  Slug is immutable.
     """
-    allowed = {"name", "org", "default_owner", "taxonomy_components", "taxonomy_environments"}
+    allowed = {
+        "name",
+        "org",
+        "default_owner",
+        "taxonomy_components",
+        "taxonomy_environments",
+        # SP3.2: git_url is mutable so the Playwright setup (and operators) can
+        # wire the publish remote through the API without a DB shell.
+        "git_url",
+    }
     for key, value in body.items():
         if key in allowed:
             setattr(project, key, value)

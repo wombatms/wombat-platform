@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from wombat_api.rbac.models import Role
 
 
-class Permission(str, Enum):
+class Permission(StrEnum):
     CONTENT_PROPOSE = "content:propose"
     CONTENT_PUBLISH_DIRECT = "content:publish_direct"
 

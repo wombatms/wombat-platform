@@ -62,9 +62,8 @@ async def publish_proposal(
         _fetch_and_reset(clone_root)
 
         # Step 3-4: conflict detection.
-        if (
-            not _is_ancestor(clone_root, proposal.base_revision, "origin/main")
-            and _path_touched_since(clone_root, proposal.base_revision, proposal.source_path)
+        if not _is_ancestor(clone_root, proposal.base_revision, "origin/main") and _path_touched_since(
+            clone_root, proposal.base_revision, proposal.source_path
         ):
             current_sha = _current_sha(clone_root)
             raise ConflictError(current_sha=current_sha)
@@ -188,9 +187,7 @@ def _fetch_and_reset(clone_root: Path) -> None:
 
 def _is_ancestor(clone_root: Path, base: str, head: str) -> bool:
     """Return True if `base` is an ancestor of `head` (i.e. no new commits)."""
-    r = subprocess.run(
-        ["git", "-C", str(clone_root), "merge-base", "--is-ancestor", base, head]
-    )
+    r = subprocess.run(["git", "-C", str(clone_root), "merge-base", "--is-ancestor", base, head])
     return r.returncode == 0
 
 

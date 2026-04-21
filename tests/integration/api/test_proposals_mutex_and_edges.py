@@ -15,8 +15,6 @@ Cases:
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import secrets
 import subprocess
 
 import pytest
@@ -35,15 +33,13 @@ def _remote_main_sha(remote) -> str:
 
 def _push_file_to_remote(remote, filename: str, content: str) -> str:
     """Clone, add file, push, return new HEAD SHA."""
-    import tempfile
     import os
+    import tempfile
 
     with tempfile.TemporaryDirectory() as tmp:
         clone_dir = os.path.join(tmp, "clone")
         subprocess.run(["git", "clone", str(remote), clone_dir], check=True, capture_output=True)
-        subprocess.run(
-            ["git", "-C", clone_dir, "checkout", "main"], check=True, capture_output=True
-        )
+        subprocess.run(["git", "-C", clone_dir, "checkout", "main"], check=True, capture_output=True)
         file_path = os.path.join(clone_dir, filename)
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         with open(file_path, "w") as f:
@@ -54,9 +50,7 @@ def _push_file_to_remote(remote, filename: str, content: str) -> str:
             check=True,
             capture_output=True,
         )
-        subprocess.run(
-            ["git", "-C", clone_dir, "push", "origin", "main"], check=True, capture_output=True
-        )
+        subprocess.run(["git", "-C", clone_dir, "push", "origin", "main"], check=True, capture_output=True)
         return subprocess.run(
             ["git", "-C", str(remote), "rev-parse", "main"],
             capture_output=True,
@@ -80,11 +74,11 @@ async def _grant_roles_on_project(db_session, project, *user_role_pairs):
 
 async def _create_proposal_and_admin_b(httpx_client, db_session, project, users, source_path, title):
     """Helper: create a proposal as admin_A, return (proposal_id, admin_b_token)."""
+    import secrets as sec
+
     from wombat_api.auth.jwt import create_access_token
     from wombat_api.auth.passwords import hash_password
     from wombat_api.database.models import UserDB, UserProjectRoleDB
-
-    import secrets as sec
 
     admin_user = users["admin"]["user"]
     admin_token = users["admin"]["token"]
@@ -120,7 +114,9 @@ async def _create_proposal_and_admin_b(httpx_client, db_session, project, users,
     # Get the remote sha from the project's git_url.
     actual_sha = subprocess.run(
         ["git", "-C", project.git_url, "rev-parse", "main"],
-        capture_output=True, text=True, check=True,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout.strip()
 
     r = await httpx_client.post(
@@ -160,10 +156,11 @@ async def test_mutex_concurrent_approvals(
     admin_token = users["admin"]["token"]
 
     # Create second admin.
+    import secrets as sec
+
     from wombat_api.auth.jwt import create_access_token
     from wombat_api.auth.passwords import hash_password
     from wombat_api.database.models import UserDB, UserProjectRoleDB
-    import secrets as sec
 
     admin_b = UserDB(
         email=f"mutex-admin-b-{sec.token_hex(4)}@test.example",
@@ -239,7 +236,9 @@ async def test_mutex_concurrent_approvals(
     # Both commits must be in the remote's main history.
     log = subprocess.run(
         ["git", "-C", str(remote), "log", "--format=%H", "main"],
-        capture_output=True, text=True, check=True,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout
     assert sha_a in log, f"sha_a {sha_a} not found in remote log"
     assert sha_b in log, f"sha_b {sha_b} not found in remote log"
@@ -258,10 +257,11 @@ async def test_push_rejection_returns_502(
     admin_user = users["admin"]["user"]
     admin_token = users["admin"]["token"]
 
+    import secrets as sec
+
     from wombat_api.auth.jwt import create_access_token
     from wombat_api.auth.passwords import hash_password
     from wombat_api.database.models import UserDB, UserProjectRoleDB
-    import secrets as sec
 
     admin_b = UserDB(
         email=f"push-reject-admin-b-{sec.token_hex(4)}@test.example",
@@ -334,11 +334,11 @@ async def test_delete_flow_removes_file_and_content_row(
     admin_user = users["admin"]["user"]
     admin_token = users["admin"]["token"]
 
+    import secrets as sec
+
     from wombat_api.auth.jwt import create_access_token
     from wombat_api.auth.passwords import hash_password
     from wombat_api.database.models import Content, UserDB, UserProjectRoleDB
-    from sqlalchemy import select, and_
-    import secrets as sec
 
     admin_b = UserDB(
         email=f"delete-admin-b-{sec.token_hex(4)}@test.example",
@@ -432,11 +432,13 @@ async def test_reindex_failure_sets_stale_embedding(
     admin_user = users["admin"]["user"]
     admin_token = users["admin"]["token"]
 
+    import secrets as sec
+
+    from sqlalchemy import and_, select
+
     from wombat_api.auth.jwt import create_access_token
     from wombat_api.auth.passwords import hash_password
     from wombat_api.database.models import Content, UserDB, UserProjectRoleDB
-    from sqlalchemy import select, and_
-    import secrets as sec
 
     admin_b = UserDB(
         email=f"reindex-admin-b-{sec.token_hex(4)}@test.example",
@@ -496,7 +498,6 @@ async def test_reindex_failure_sets_stale_embedding(
     assert published_sha
 
     # Verify content row has stale_embedding=True.
-    from sqlalchemy import select, and_
 
     q = select(Content).where(
         and_(

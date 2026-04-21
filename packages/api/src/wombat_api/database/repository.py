@@ -122,9 +122,7 @@ class Repository:
         )
         return list((await self.session.execute(q)).scalars())
 
-    async def list_user_project_roles(
-        self, user_id: uuid.UUID
-    ) -> list[tuple[str, str]]:
+    async def list_user_project_roles(self, user_id: uuid.UUID) -> list[tuple[str, str]]:
         """Return (project_slug, role) pairs for all projects the user has a role on."""
         q = (
             select(ProjectDB.slug, UserProjectRoleDB.role)
@@ -632,9 +630,7 @@ class Repository:
     async def get_proposal(self, proposal_id: uuid.UUID) -> ProposalDB | None:
         return await self.session.get(ProposalDB, proposal_id)
 
-    async def get_proposal_with_events(
-        self, proposal_id: uuid.UUID
-    ) -> tuple[ProposalDB, list[ProposalEventDB]] | None:
+    async def get_proposal_with_events(self, proposal_id: uuid.UUID) -> tuple[ProposalDB, list[ProposalEventDB]] | None:
         proposal = await self.get_proposal(proposal_id)
         if proposal is None:
             return None
@@ -749,14 +745,10 @@ class Repository:
         """
         await self.session.execute(
             sa_delete(ProposalEventDB).where(
-                ProposalEventDB.proposal_id.in_(
-                    select(ProposalDB.id).where(ProposalDB.project_id == project_id)
-                )
+                ProposalEventDB.proposal_id.in_(select(ProposalDB.id).where(ProposalDB.project_id == project_id))
             )
         )
-        await self.session.execute(
-            sa_delete(ProposalDB).where(ProposalDB.project_id == project_id)
-        )
+        await self.session.execute(sa_delete(ProposalDB).where(ProposalDB.project_id == project_id))
         await self.session.flush()
 
     async def get_user(self, user_id: uuid.UUID) -> UserDB | None:

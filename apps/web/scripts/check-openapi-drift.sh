@@ -20,7 +20,8 @@ SNAPSHOT_JSON="apps/web/openapi.snapshot.json"
 echo "==> Checking OpenAPI schema drift against ${API_URL}"
 
 # ── 1. Regenerate schema.d.ts ──────────────────────────────────────────────
-tmp_ts=$(mktemp --suffix=.d.ts)
+# Use mktemp in a portable way (BSD mktemp on macOS has no --suffix flag).
+tmp_ts="$(mktemp)".d.ts
 echo "    Regenerating ${SCHEMA_TS}…"
 
 pnpm --filter web exec openapi-typescript "${API_URL}/openapi.json" -o "${tmp_ts}"
@@ -40,7 +41,8 @@ rm -f "${tmp_ts}"
 echo "    schema.d.ts is up to date."
 
 # ── 2. Regenerate openapi.snapshot.json ───────────────────────────────────
-tmp_json=$(mktemp --suffix=.json)
+# Use mktemp in a portable way (BSD mktemp on macOS has no --suffix flag).
+tmp_json="$(mktemp)".json
 echo "    Regenerating ${SNAPSHOT_JSON}…"
 
 curl -sf "${API_URL}/openapi.json" -o "${tmp_json}"

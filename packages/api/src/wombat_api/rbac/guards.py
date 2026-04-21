@@ -21,15 +21,13 @@ def forbid_self_approval(proposal: ProposalDB, principal: Principal) -> None:
             detail={
                 "code": "self_approval_forbidden",
                 "message": "Authors cannot approve their own proposals. "
-                           "Use direct-publish if you have the permission, "
-                           "or wait for another admin.",
+                "Use direct-publish if you have the permission, "
+                "or wait for another admin.",
             },
         )
 
 
-def require_direct_publish(
-    principal: Principal, role: Role, auto_approve: bool
-) -> None:
+def require_direct_publish(principal: Principal, role: Role, auto_approve: bool) -> None:
     """When auto_approve=True on CREATE, verify the principal has publish_direct.
 
     Ignored (and treated as False) on any other route — enforced at the route

@@ -254,9 +254,7 @@ class ProposalDB(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"))
     # Nullable: new-file proposals have no existing content row yet.
-    content_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("content.id"), nullable=True
-    )
+    content_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("content.id"), nullable=True)
     kind: Mapped[str] = mapped_column(String)  # testcase | shared_step | story
     source_path: Mapped[str] = mapped_column(String)
     base_revision: Mapped[str] = mapped_column(String)
@@ -270,9 +268,7 @@ class ProposalDB(Base):
     status: Mapped[str] = mapped_column(String, default="open")
     # open | published | rejected | conflict | withdrawn
     published_sha: Mapped[str | None] = mapped_column(String, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
@@ -290,16 +286,12 @@ class ProposalEventDB(Base):
     __tablename__ = "proposal_events"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    proposal_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("proposals.id", ondelete="CASCADE")
-    )
+    proposal_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("proposals.id", ondelete="CASCADE"))
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     action: Mapped[str] = mapped_column(String)
     # created | updated | approved | direct_published | rejected | withdrawn | conflict_detected
     comment: Mapped[str | None] = mapped_column(String, nullable=True)
     detail: Mapped[dict | None] = mapped_column(_PortableJSONB, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (Index("ix_proposal_event_proposal", "proposal_id", "created_at"),)

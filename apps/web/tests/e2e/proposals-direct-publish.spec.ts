@@ -30,7 +30,7 @@ test.describe("Proposals direct-publish flow", () => {
     );
 
     // Wait for the form to load
-    await expect(page.getByPlaceholderText(/content title/i)).toBeVisible({
+    await expect(page.getByPlaceholder(/content title/i)).toBeVisible({
       timeout: 15_000,
     });
 
@@ -49,7 +49,7 @@ test.describe("Proposals direct-publish flow", () => {
     }
 
     // Update the title
-    const titleInput = page.getByPlaceholderText(/content title/i);
+    const titleInput = page.getByPlaceholder(/content title/i);
     await titleInput.fill(DIRECT_PUBLISH_TITLE);
 
     // Click "Publish directly"

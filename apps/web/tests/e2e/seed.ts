@@ -19,6 +19,11 @@
 import { execSync } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
+
+// Shim __dirname for ESM — apps/web uses "type": "module".
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const API_BASE = process.env.WOMBAT_API_URL ?? "http://localhost:8000";
 const FIXTURE_DIR = path.resolve(__dirname, "../fixtures/content");

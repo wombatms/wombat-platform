@@ -14,7 +14,6 @@ Cases:
 from __future__ import annotations
 
 import subprocess
-import uuid
 
 import pytest
 from httpx import AsyncClient
@@ -36,8 +35,8 @@ def _push_file_to_remote(remote, filename: str, content: str) -> str:
     Uses a temporary working clone so we don't need low-level plumbing commands
     that behave differently on bare repos. Returns the new HEAD SHA on the remote.
     """
-    import tempfile
     import os
+    import tempfile
 
     with tempfile.TemporaryDirectory() as tmp:
         clone_dir = os.path.join(tmp, "clone")
@@ -187,8 +186,8 @@ def _make_orphan_sha_in_remote(remote) -> str:
     ancestry chain (e.g. after a force-push). This helper creates that
     scenario by writing an orphan commit directly to the object store.
     """
-    import tempfile
     import os
+    import tempfile
 
     with tempfile.TemporaryDirectory() as tmp:
         work = os.path.join(tmp, "work")
@@ -205,7 +204,9 @@ def _make_orphan_sha_in_remote(remote) -> str:
         )
         orphan_sha = subprocess.run(
             ["git", "-C", work, "rev-parse", "HEAD"],
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
         ).stdout.strip()
         # Pack and copy the object into the bare remote.
         pack_result = subprocess.run(
@@ -248,11 +249,12 @@ async def test_stale_base_revision_same_path_conflict(
     admin_token = users["admin"]["token"]
 
     # We need a second admin to approve (no self-approval allowed).
+    import secrets as sec
+
     from wombat_api.auth.jwt import create_access_token
     from wombat_api.auth.passwords import hash_password
     from wombat_api.database.models import UserDB
 
-    import secrets as sec
     admin_b = UserDB(
         email=f"admin-b-{sec.token_hex(4)}@test.example",
         hashed_password=hash_password("Test1234!"),
@@ -332,11 +334,12 @@ async def test_different_path_commit_does_not_conflict(
     admin_token = users["admin"]["token"]
 
     # Second admin to approve.
+    import secrets as sec
+
     from wombat_api.auth.jwt import create_access_token
     from wombat_api.auth.passwords import hash_password
     from wombat_api.database.models import UserDB
 
-    import secrets as sec
     admin_b = UserDB(
         email=f"admin-b2-{sec.token_hex(4)}@test.example",
         hashed_password=hash_password("Test1234!"),

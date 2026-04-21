@@ -42,7 +42,7 @@ test.describe("Admin token-grant flow", () => {
     await expect(page.getByRole("dialog")).toBeVisible({ timeout: 5_000 });
 
     // --- Fill in token name ---
-    const nameInput = page.getByPlaceholderText(/e.g. ci pipeline/i);
+    const nameInput = page.getByPlaceholder(/e.g. ci pipeline/i);
     await nameInput.fill(`E2E direct-publish token ${Date.now()}`);
 
     // --- Expand Advanced options ---
@@ -69,7 +69,7 @@ test.describe("Admin token-grant flow", () => {
     await page.getByRole("checkbox", { name: /grant direct-publish/i }).check();
 
     // --- Validate: Purpose field appears and is required ---
-    const purposeInput = page.getByPlaceholderText(
+    const purposeInput = page.getByPlaceholder(
       /automated content pipeline/i,
     );
     await expect(purposeInput).toBeVisible({ timeout: 3_000 });
@@ -130,7 +130,7 @@ test.describe("Admin token-grant flow", () => {
     await expect(page.getByRole("dialog")).toBeVisible({ timeout: 5_000 });
 
     // Fill name only
-    await page.getByPlaceholderText(/e.g. ci pipeline/i).fill("Validation test token");
+    await page.getByPlaceholder(/e.g. ci pipeline/i).fill("Validation test token");
 
     // Expand Advanced and tick grant
     const advancedBtn = page.getByRole("button", { name: /advanced options/i });

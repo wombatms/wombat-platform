@@ -71,9 +71,7 @@ async def create_proposal(
                 "existing_proposal_id": str(e.existing_proposal_id),
             },
         ) from e
-    await repo.append_proposal_event(
-        proposal_id=proposal.id, user_id=principal.user.id, action="created"
-    )
+    await repo.append_proposal_event(proposal_id=proposal.id, user_id=principal.user.id, action="created")
 
     if auto_approve:
         try:
@@ -106,9 +104,7 @@ async def create_proposal(
                 status_code=502,
                 detail={"code": "push_failed", "stderr": e.stderr},
             ) from e
-        await repo.transition_proposal_status(
-            proposal.id, new_status="published", published_sha=result.published_sha
-        )
+        await repo.transition_proposal_status(proposal.id, new_status="published", published_sha=result.published_sha)
         await repo.append_proposal_event(
             proposal_id=proposal.id,
             user_id=principal.user.id,
@@ -217,9 +213,7 @@ async def update_proposal(
             status_code=409,
             detail={"code": "stale_base_revision", "current": e.current},
         ) from e
-    await repo.append_proposal_event(
-        proposal_id=existing.id, user_id=principal.user.id, action="updated"
-    )
+    await repo.append_proposal_event(proposal_id=existing.id, user_id=principal.user.id, action="updated")
     await session.commit()
     return {"data": _proposal_to_response(updated).model_dump()}
 
@@ -238,9 +232,7 @@ async def withdraw_proposal(
     if p.author_user_id != principal.user.id:
         raise HTTPException(status_code=403, detail={"code": "not_author"})
     await repo.transition_proposal_status(p.id, new_status="withdrawn")
-    await repo.append_proposal_event(
-        proposal_id=p.id, user_id=principal.user.id, action="withdrawn"
-    )
+    await repo.append_proposal_event(proposal_id=p.id, user_id=principal.user.id, action="withdrawn")
     await session.commit()
 
 
@@ -290,9 +282,7 @@ async def approve_proposal(
             detail={"code": "push_failed", "stderr": e.stderr},
         ) from e
 
-    await repo.transition_proposal_status(
-        proposal.id, new_status="published", published_sha=result.published_sha
-    )
+    await repo.transition_proposal_status(proposal.id, new_status="published", published_sha=result.published_sha)
     await repo.append_proposal_event(
         proposal_id=proposal.id,
         user_id=principal.user.id,

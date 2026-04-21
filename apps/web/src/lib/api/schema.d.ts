@@ -80,7 +80,13 @@ export interface paths {
         };
         /**
          * Me
-         * @description Return the authenticated user's profile.
+         * @description Return the authenticated user's profile, including per-project permissions.
+         *
+         *     permissions_by_project is computed from:
+         *     - The user's role on each project (role_permissions).
+         *     - Whether the acting token carries publish_direct (additive grant).
+         *
+         *     This is computed at request time; there is no RBAC cache on the frontend.
          */
         get: operations["me_api_auth_me_get"];
         put?: never;
@@ -1145,6 +1151,13 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Permissions By Project
+             * @default {}
+             */
+            permissions_by_project: {
+                [key: string]: string[];
+            };
         };
         /** ValidationError */
         ValidationError: {

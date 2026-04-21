@@ -31,7 +31,6 @@ from wombat_api.database.repository import (
     StaleBaseRevisionError,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -200,9 +199,7 @@ async def test_transition_and_event_log(session, seeded):
         author_user_id=user.id,
         author_kind="human",
     )
-    await repo.append_proposal_event(
-        proposal_id=p.id, user_id=user.id, action="created"
-    )
+    await repo.append_proposal_event(proposal_id=p.id, user_id=user.id, action="created")
     await repo.append_proposal_event(
         proposal_id=p.id,
         user_id=user.id,
@@ -210,9 +207,7 @@ async def test_transition_and_event_log(session, seeded):
         comment="LGTM",
         detail={"reviewer": "qa"},
     )
-    updated = await repo.transition_proposal_status(
-        p.id, new_status="published", published_sha="cafe"
-    )
+    updated = await repo.transition_proposal_status(p.id, new_status="published", published_sha="cafe")
     assert updated.status == "published"
     assert updated.published_sha == "cafe"
 

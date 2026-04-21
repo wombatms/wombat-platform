@@ -30,9 +30,7 @@ def _int_key(project_id: uuid.UUID) -> int:
 
 
 @asynccontextmanager
-async def project_publish_lock(
-    session: AsyncSession, project_id: uuid.UUID
-) -> AsyncIterator[None]:
+async def project_publish_lock(session: AsyncSession, project_id: uuid.UUID) -> AsyncIterator[None]:
     async with _project_locks[project_id]:
         dialect = session.bind.dialect.name if session.bind else "sqlite"
         if dialect == "postgresql":

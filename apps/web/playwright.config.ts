@@ -1,5 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Shim __dirname for ESM — apps/web sets "type": "module" in package.json,
+// so Playwright's config loader evaluates this file as an ES module.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Playwright configuration for the Wombat web app.

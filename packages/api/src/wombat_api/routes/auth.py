@@ -21,6 +21,8 @@ from wombat_api.auth.passwords import hash_password, verify_password
 from wombat_api.database.engine import get_session
 from wombat_api.database.models import APITokenDB, UserDB
 from wombat_api.database.repository import Repository
+from wombat_api.rbac.models import Role
+from wombat_api.rbac.permissions import role_permissions
 from wombat_api.schemas.auth import (
     APITokenResponse,
     CreateAPITokenRequest,
@@ -31,8 +33,6 @@ from wombat_api.schemas.auth import (
     TokenResponse,
     UserResponse,
 )
-from wombat_api.rbac.models import Role
-from wombat_api.rbac.permissions import role_permissions
 from wombat_api.schemas.common import UserCreate
 
 router = APIRouter()
@@ -156,6 +156,7 @@ async def me(
         # Additive: if the acting token has publish_direct, grant it globally.
         if principal.token is not None and principal.token.publish_direct:
             from wombat_api.rbac.permissions import Permission  # local import to avoid circular
+
             perms.add(str(Permission.CONTENT_PUBLISH_DIRECT))
         permissions_by_project[slug] = sorted(perms)
 

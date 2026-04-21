@@ -22,3 +22,6 @@ apps/*/playwright.config.js
 
 # Playwright auth state (contains real tokens — never commit)
 apps/*/tests/e2e/.auth/*.json
+
+# Playwright temp git-remote info (SP3.2)
+apps/*/tests/e2e/.git-remote-info.json

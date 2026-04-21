@@ -536,7 +536,9 @@ export function ApprovalsInboxPage() {
         className="shrink-0 border-t px-5 py-2 flex items-center gap-4 text-[10px]"
         style={{
           borderColor: "var(--border-subtle)",
-          color: "var(--fg-disabled)",
+          // Use --fg-muted (WCAG AA compliant) rather than --fg-disabled
+          // so the shortcut legend passes axe color-contrast gates.
+          color: "var(--fg-muted)",
         }}
       >
         <span><kbd className="font-mono">j/k</kbd> navigate</span>
