@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { isApiError } from "@/lib/api/errors";
@@ -28,13 +28,20 @@ async function detectBootstrap(): Promise<boolean> {
 export function LoginPage() {
   const { login, status } = useSession();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const nextPath = searchParams.get("next") ?? "/projects";
+
+  // Flash message from RegisterPage 403 redirect
+  const locationState = location.state as { flash?: string; registered?: boolean } | null;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [flashMsg, setFlashMsg] = useState<string | null>(
+    locationState?.flash ?? (locationState?.registered ? "Account created — please sign in." : null),
+  );
   const [capsLock, setCapsLock] = useState(false);
   const [showBootstrapLink, setShowBootstrapLink] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -95,6 +102,19 @@ export function LoginPage() {
             Sign in to your account
           </p>
         </div>
+
+        {flashMsg && (
+          <p
+            className="mb-4 rounded-md px-3 py-2 text-sm"
+            style={{
+              background: "var(--feedback-info-bg)",
+              color: "var(--feedback-info-fg)",
+            }}
+            role="status"
+          >
+            {flashMsg}
+          </p>
+        )}
 
         <form onSubmit={(e) => { void handleSubmit(e); }} noValidate>
           <div className="space-y-4">

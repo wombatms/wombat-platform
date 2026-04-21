@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { AppShell } from "./layouts/AppShell";
 import { PublicLayout } from "./layouts/PublicLayout";
 import { LoginPage } from "@/features/auth/LoginPage";
+import { RegisterPage } from "@/features/auth/RegisterPage";
 
 function PlaceholderPage({ name }: { name: string }) {
   return (
@@ -19,7 +20,7 @@ export function Router() {
     <Routes>
       <Route element={<PublicLayout />}>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<PlaceholderPage name="Register (bootstrap)" />} />
+        <Route path="/register" element={<RegisterPage />} />
       </Route>
       <Route element={<AppShell />}>
         <Route index element={<Navigate to="/projects" replace />} />
