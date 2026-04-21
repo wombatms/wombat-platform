@@ -1,3 +1,4 @@
+import type { MouseEvent } from "react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ExternalLink } from "lucide-react";
@@ -32,35 +33,35 @@ interface LinkedEntityRefProps {
 export function LinkedEntityRef({ entity, className }: LinkedEntityRefProps) {
   const [open, setOpen] = useState(false);
 
-  const chip = (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded px-1.5 py-0.5",
-        "font-mono text-[11px] font-medium leading-none",
-        "cursor-pointer outline-none select-none",
-        "transition-colors duration-120",
-        "focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)]",
-        className,
-      )}
-      style={{
-        background: "var(--code-bg)",
-        color: "var(--accent-fg)",
-        border: "1px solid var(--border-default)",
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLSpanElement).style.borderColor =
-          "var(--accent-primary)";
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLSpanElement).style.borderColor =
-          "var(--border-default)";
-      }}
-    >
+  const chipClasses = cn(
+    "inline-flex items-center gap-1 rounded px-1.5 py-0.5",
+    "font-mono text-[11px] font-medium leading-none",
+    "cursor-pointer outline-none select-none",
+    "transition-colors duration-120",
+    "focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)]",
+    className,
+  );
+
+  const chipStyle = {
+    background: "var(--code-bg)",
+    color: "var(--accent-fg)",
+    border: "1px solid var(--border-default)",
+  };
+
+  const handleMouseEnter = (e: MouseEvent<HTMLElement>) => {
+    (e.currentTarget as HTMLElement).style.borderColor = "var(--accent-primary)";
+  };
+  const handleMouseLeave = (e: MouseEvent<HTMLElement>) => {
+    (e.currentTarget as HTMLElement).style.borderColor = "var(--border-default)";
+  };
+
+  const chipContent = (
+    <>
       {entity.id}
       {entity.href && (
         <ExternalLink className="h-2.5 w-2.5 opacity-60" aria-hidden="true" />
       )}
-    </span>
+    </>
   );
 
   return (
@@ -70,17 +71,23 @@ export function LinkedEntityRef({ entity, className }: LinkedEntityRefProps) {
           <Link
             to={entity.href}
             aria-label={`${entity.kind ?? "Entity"} ${entity.id}: ${entity.title}`}
-            tabIndex={0}
+            className={chipClasses}
+            style={chipStyle}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
           >
-            {chip}
+            {chipContent}
           </Link>
         ) : (
           <button
             type="button"
             aria-label={`${entity.kind ?? "Entity"} ${entity.id}: ${entity.title}`}
-            className="inline-flex"
+            className={chipClasses}
+            style={chipStyle}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
           >
-            {chip}
+            {chipContent}
           </button>
         )}
       </PopoverTrigger>

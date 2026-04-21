@@ -94,13 +94,13 @@ export function AppShell() {
   return (
     <RequireAuth>
       <div
-        className="flex flex-col min-h-screen"
+        className="flex h-screen flex-col overflow-hidden"
         style={{ background: "var(--bg-app)", color: "var(--fg-default)" }}
       >
         {/* Fixed header */}
         <Header onOpenCommandPalette={openPalette} />
 
-        {/* Body: nav + main side-by-side */}
+        {/* Body: nav + main side-by-side — fills remaining height */}
         <div className="flex flex-1 overflow-hidden">
           {/* Left nav — fixed width, scrollable on overflow */}
           <aside

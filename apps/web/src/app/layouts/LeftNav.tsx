@@ -15,6 +15,7 @@ interface NavItem {
   icon: ComponentType<SVGProps<SVGSVGElement> & { className?: string }>;
   to: string;
   key: string;
+  disabled?: boolean;
 }
 
 function useNavItems(projectSlug: string | undefined): {
@@ -22,12 +23,13 @@ function useNavItems(projectSlug: string | undefined): {
   secondary: NavItem[];
 } {
   const base = projectSlug ? `/p/${projectSlug}` : "";
+  const noProject = !projectSlug;
 
   const primary: NavItem[] = [
-    { key: "library", label: "Test Library", icon: BookOpen, to: `${base}/library` },
-    { key: "shared-steps", label: "Shared Steps", icon: Share2, to: `${base}/shared-steps` },
-    { key: "stories", label: "Stories", icon: BookMarked, to: `${base}/stories` },
-    { key: "search", label: "Search", icon: Search, to: `${base}/search` },
+    { key: "library", label: "Test Library", icon: BookOpen, to: `${base}/library`, disabled: noProject },
+    { key: "shared-steps", label: "Shared Steps", icon: Share2, to: `${base}/shared-steps`, disabled: noProject },
+    { key: "stories", label: "Stories", icon: BookMarked, to: `${base}/stories`, disabled: noProject },
+    { key: "search", label: "Search", icon: Search, to: `${base}/search`, disabled: noProject },
   ];
 
   const secondary: NavItem[] = [
@@ -39,10 +41,24 @@ function useNavItems(projectSlug: string | undefined): {
 
 function NavItemLink({ item }: { item: NavItem }) {
   const Icon = item.icon;
+
+  if (item.disabled) {
+    return (
+      <span
+        aria-disabled="true"
+        title={`Select a project to access ${item.label}`}
+        className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium cursor-not-allowed select-none"
+        style={{ color: "var(--fg-disabled)", opacity: 0.5 }}
+      >
+        <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <span>{item.label}</span>
+      </span>
+    );
+  }
+
   return (
     <NavLink
       to={item.to}
-      aria-label={item.label}
       className={({ isActive }) =>
         cn(
           "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium",
@@ -57,10 +73,7 @@ function NavItemLink({ item }: { item: NavItem }) {
     >
       {({ isActive }: { isActive: boolean }) => (
         <>
-          <Icon
-            className="h-4 w-4 shrink-0"
-            aria-hidden="true"
-          />
+          <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span>{item.label}</span>
           {isActive && <span className="sr-only">(current page)</span>}
         </>
@@ -97,10 +110,6 @@ export function LeftNav() {
       aria-label="Main navigation"
       onKeyDown={handleKeyDown}
       className="flex h-full flex-col gap-1 px-2 py-3"
-      style={{
-        borderRight: "1px solid var(--border-default)",
-        background: "var(--bg-surface-1)",
-      }}
     >
       <ul className="flex flex-col gap-0.5">
         {primary.map((item) => (

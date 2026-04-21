@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { useProjects } from "./useProjects";
 
 function RoleBadge({ role }: { role?: string }) {
@@ -15,27 +15,28 @@ function RoleBadge({ role }: { role?: string }) {
   );
 }
 
+function PickerSkeleton() {
+  return (
+    <div className="mx-auto max-w-xl px-6 py-12 space-y-4" aria-busy="true" aria-label="Loading projects">
+      <div className="h-7 w-44 rounded animate-pulse" style={{ background: "var(--bg-surface-3)" }} />
+      <div className="h-4 w-80 rounded animate-pulse" style={{ background: "var(--bg-surface-3)" }} />
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="h-[72px] w-full rounded-lg animate-pulse" style={{ background: "var(--bg-surface-2)", border: "1px solid var(--border-default)" }} />
+      ))}
+    </div>
+  );
+}
+
 export function ProjectPickerPage() {
-  const { data: projects, isLoading, error } = useProjects();
+  const { data: projects, isLoading, isError, error, refetch } = useProjects();
   const navigate = useNavigate();
 
-  if (isLoading) {
-    return (
-      <div className="mx-auto max-w-xl px-6 py-12 space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-20 w-full" />
-        <Skeleton className="h-20 w-full" />
-        <Skeleton className="h-20 w-full" />
-      </div>
-    );
-  }
+  if (isLoading) return <PickerSkeleton />;
 
-  if (error) {
+  if (isError) {
     return (
       <div className="mx-auto max-w-xl px-6 py-12">
-        <p className="text-sm" style={{ color: "var(--feedback-error-fg)" }}>
-          Failed to load projects. Please try refreshing.
-        </p>
+        <ErrorState error={error} onRetry={() => void refetch()} />
       </div>
     );
   }

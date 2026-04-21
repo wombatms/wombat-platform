@@ -247,7 +247,7 @@ function AddFilterButton({ available, onAdd, compact }: AddFilterButtonProps) {
             className={cn(
               "h-8 w-full rounded-md border px-2 text-xs outline-none",
               "transition-[border-color,box-shadow] duration-120",
-              "focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)]/30",
+              "focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)]",
               "focus-visible:border-[color:var(--focus-ring)]",
               "appearance-none cursor-pointer",
             )}
@@ -289,7 +289,7 @@ function AddFilterButton({ available, onAdd, compact }: AddFilterButtonProps) {
                 "h-8 w-full rounded-md border px-3 text-xs outline-none",
                 "transition-[border-color,box-shadow] duration-120",
                 "disabled:cursor-not-allowed disabled:opacity-50",
-                "focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)]/30",
+                "focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)]",
                 "focus-visible:border-[color:var(--focus-ring)]",
                 "placeholder:text-[color:var(--fg-disabled)]",
               )}
