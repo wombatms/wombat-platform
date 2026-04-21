@@ -22,6 +22,12 @@ import {
 } from "../fixtures/shared-steps";
 import { FIXTURE_STORIES_LIST, FIXTURE_STORY_1, FIXTURE_STORY_2 } from "../fixtures/stories";
 import { FIXTURE_SEARCH_RESULT } from "../fixtures/search";
+import {
+  FIXTURE_PROPOSAL,
+  FIXTURE_PROPOSAL_DETAIL,
+  FIXTURE_PROPOSALS_LIST,
+  FIXTURE_PROPOSAL_ID,
+} from "../fixtures/proposals";
 
 // Helper to build a lookup map from wombat_id
 function byWombatId<T extends { wombat_id: string }>(items: T[]): Map<string, T> {
@@ -211,6 +217,50 @@ export const handlers = [
       query: body.query,
       mode: body.mode ?? "hybrid",
     });
+  }),
+
+  // --- Proposals ---
+
+  http.get("*/api/projects/:project_slug/proposals", () => {
+    return HttpResponse.json(FIXTURE_PROPOSALS_LIST);
+  }),
+
+  http.get("*/api/projects/:project_slug/proposals/:proposal_id", ({ params }) => {
+    const proposalId = params["proposal_id"] as string;
+    if (proposalId !== FIXTURE_PROPOSAL_ID) {
+      return HttpResponse.json(
+        { detail: { code: "proposal_not_found", message: "Proposal not found." } },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json({ data: FIXTURE_PROPOSAL_DETAIL });
+  }),
+
+  http.post("*/api/projects/:project_slug/proposals", async ({ request }) => {
+    const url = new URL(request.url);
+    const autoApprove = url.searchParams.get("auto_approve") === "true";
+    const responseData = autoApprove
+      ? { data: { proposal: FIXTURE_PROPOSAL, published_sha: "published-sha-abc123" } }
+      : { data: { proposal: FIXTURE_PROPOSAL } };
+    return HttpResponse.json(responseData, { status: 201 });
+  }),
+
+  http.put("*/api/projects/:project_slug/proposals/:proposal_id", () => {
+    return HttpResponse.json({ data: FIXTURE_PROPOSAL });
+  }),
+
+  http.delete("*/api/projects/:project_slug/proposals/:proposal_id", () => {
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.post("*/api/projects/:project_slug/proposals/:proposal_id/approve", () => {
+    return HttpResponse.json({
+      data: { proposal: { ...FIXTURE_PROPOSAL, status: "published" }, published_sha: "sha-approved" },
+    });
+  }),
+
+  http.post("*/api/projects/:project_slug/proposals/:proposal_id/reject", () => {
+    return HttpResponse.json({ data: { ...FIXTURE_PROPOSAL, status: "rejected" } });
   }),
 
   // --- Content (generic) ---
