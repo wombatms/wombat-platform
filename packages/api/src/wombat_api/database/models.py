@@ -89,6 +89,9 @@ class APITokenDB(Base):
     name: Mapped[str] = mapped_column(String)
     scopes: Mapped[list[str]] = mapped_column(JSON, default=list)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # SP3.2 additions
+    publish_direct: Mapped[bool] = mapped_column(default=False)
+    purpose: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
