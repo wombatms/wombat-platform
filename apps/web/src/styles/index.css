@@ -1,0 +1,42 @@
+@import "tailwindcss";
+@import "./tokens-light.css";
+@import "./tokens-dark.css";
+
+@theme {
+  --color-app: var(--bg-app);
+  --color-surface-1: var(--bg-surface-1);
+  --color-surface-2: var(--bg-surface-2);
+  --color-surface-3: var(--bg-surface-3);
+  --color-fg: var(--fg-default);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-disabled: var(--fg-disabled);
+  --color-border-default: var(--border-default);
+  --color-border-subtle: var(--border-subtle);
+  --color-accent: var(--accent-primary);
+  --color-accent-hover: var(--accent-primary-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-focus: var(--focus-ring);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "JetBrains Mono", "Menlo", monospace;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background: var(--bg-app);
+  color: var(--fg-default);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
