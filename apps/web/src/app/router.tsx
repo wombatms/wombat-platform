@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AppShell } from "./layouts/AppShell";
 import { PublicLayout } from "./layouts/PublicLayout";
+import { LoginPage } from "@/features/auth/LoginPage";
 
 function PlaceholderPage({ name }: { name: string }) {
   return (
@@ -17,7 +18,7 @@ export function Router() {
   return (
     <Routes>
       <Route element={<PublicLayout />}>
-        <Route path="/login" element={<PlaceholderPage name="Login" />} />
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<PlaceholderPage name="Register (bootstrap)" />} />
       </Route>
       <Route element={<AppShell />}>
