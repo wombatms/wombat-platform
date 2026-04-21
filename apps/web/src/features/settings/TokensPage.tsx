@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Key, Plus, Trash2 } from "lucide-react";
+import { Key, Plus, Trash2, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -84,6 +84,20 @@ function TokenRow({ token }: { token: ApiToken }) {
                 </span>
               ))}
             </div>
+          )}
+          {token.publish_direct && (
+            <span
+              title={`Direct-publish granted${token.purpose ? ` — ${token.purpose}` : ""}`}
+              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold cursor-help"
+              style={{
+                background: "color-mix(in srgb, var(--feedback-warn-fg) 12%, transparent)",
+                color: "var(--feedback-warn-fg)",
+                border: "1px solid color-mix(in srgb, var(--feedback-warn-fg) 25%, transparent)",
+              }}
+            >
+              <Zap className="h-3 w-3" aria-hidden="true" />
+              Direct-publish
+            </span>
           )}
         </div>
       </div>
