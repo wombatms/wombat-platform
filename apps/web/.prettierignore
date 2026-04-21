@@ -1,0 +1,11 @@
+dist/
+node_modules/
+src/lib/api/schema.d.ts
+coverage/
+playwright-report/
+test-results/
+pnpm-lock.yaml
+.vite/
+*.tsbuildinfo
+vite.config.d.ts
+vite.config.js
