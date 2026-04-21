@@ -6,6 +6,16 @@
  * This matches spec §11.3 ("assert zero serious/critical violations on every
  * page of the smoke suite").
  *
+ * SP3.1 screens covered: Login, Library, Detail, Search, Settings, Theme.
+ * SP3.2 screens covered (Task 52):
+ *   - ApprovalsInboxPage (/p/:slug/approvals)
+ *   - ReviewDetailPage   (/p/:slug/approvals/:proposalId)
+ *   - ConflictWorkspace  (/p/:slug/approvals/:proposalId/rebase)
+ *   - EditForm           (/p/:slug/:kind/:wombatId/edit)
+ *   - TokensPage         (/p/:slug/settings/tokens)
+ *   - CreateTokenDialog  (dialog within TokensPage)
+ *   - Token reveal dialog (one-time reveal after creation)
+ *
  * Usage:
  *   import { axeScan } from "./axe.helper";
  *   await axeScan(page);
