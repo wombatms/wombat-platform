@@ -2,16 +2,11 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { ReactNode } from "react";
 import { http, HttpResponse } from "msw";
 import { server } from "@/tests/msw/server";
 import { ApprovalsInboxPage } from "../ApprovalsInboxPage";
 import { SessionContext } from "@/features/auth/AuthProvider";
 import type { SessionContextValue } from "@/features/auth/AuthProvider";
-import {
-  FIXTURE_PROPOSALS_LIST,
-  FIXTURE_PROPOSAL_SUMMARY,
-} from "@/tests/fixtures/proposals";
 import { FIXTURE_USER } from "@/tests/fixtures/auth";
 
 beforeEach(() => {
@@ -141,7 +136,6 @@ describe("ApprovalsInboxPage", () => {
 
     await waitFor(() => {
       // ErrorState renders some error UI
-      const errorEl = screen.queryByText(/error/i) ?? screen.queryByRole("alert");
       // Either an error text or the component renders error state
       expect(document.querySelector("[aria-label]")).toBeInTheDocument();
     }, { timeout: 5000 });

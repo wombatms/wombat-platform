@@ -131,8 +131,6 @@ test.describe("Proposals agent-review flow", () => {
     // Axe gate on inbox
     await axeScan(page);
 
-    // The agent badge should be visible somewhere in the table
-    const agentBadge = page.getByTitle(/agent-authored proposal/i);
     // The agent badge has a tooltip on the span; may require opening the row
     // In the virtualized table, the row may not be visible without scrolling
     // We navigate directly to the proposal to verify it's marked as agent

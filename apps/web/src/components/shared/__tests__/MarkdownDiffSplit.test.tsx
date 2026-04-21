@@ -91,7 +91,7 @@ describe("MarkdownDiffSplit — raw mode", () => {
 describe("MarkdownDiffSplit — synchronized scroll", () => {
   beforeEach(() => {
     // Mock requestAnimationFrame
-    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+    vi.stubGlobal("requestAnimationFrame", (cb: (time: number) => void) => {
       cb(0);
       return 0;
     });

@@ -218,12 +218,10 @@ export default async function globalSetup() {
   }
 
   // 4. Provision a temp bare Git remote for proposal E2E flows (SP3.2)
-  let gitRemotePath: string | null = null;
   let gitWorkspacePath: string | null = null;
 
   try {
     const { remotePath, workspacePath } = provisionGitRemote();
-    gitRemotePath = remotePath;
     gitWorkspacePath = workspacePath;
 
     // Persist paths for globalTeardown to clean up

@@ -9,7 +9,6 @@ import { SessionContext } from "@/features/auth/AuthProvider";
 import type { SessionContextValue } from "@/features/auth/AuthProvider";
 import { FIXTURE_USER } from "@/tests/fixtures/auth";
 import { FIXTURE_TESTCASE_1 } from "@/tests/fixtures/testcases";
-import { FIXTURE_PROPOSAL, FIXTURE_PROPOSAL_ID } from "@/tests/fixtures/proposals";
 
 beforeEach(() => {
   localStorage.setItem("wombat.access", "test-access-token.payload.sig");
