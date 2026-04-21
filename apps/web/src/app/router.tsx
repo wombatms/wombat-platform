@@ -3,6 +3,7 @@ import { AppShell } from "./layouts/AppShell";
 import { PublicLayout } from "./layouts/PublicLayout";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { RegisterPage } from "@/features/auth/RegisterPage";
+import { ProjectPickerPage } from "@/features/projects/ProjectPickerPage";
 
 function PlaceholderPage({ name }: { name: string }) {
   return (
@@ -24,7 +25,7 @@ export function Router() {
       </Route>
       <Route element={<AppShell />}>
         <Route index element={<Navigate to="/projects" replace />} />
-        <Route path="/projects" element={<PlaceholderPage name="Project picker" />} />
+        <Route path="/projects" element={<ProjectPickerPage />} />
         <Route path="/p/:projectSlug">
           <Route index element={<Navigate to="library" replace />} />
           <Route path="library" element={<PlaceholderPage name="Test Library" />} />
