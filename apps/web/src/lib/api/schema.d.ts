@@ -725,6 +725,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_slug}/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Proposals */
+        get: operations["list_proposals_api_projects__project_slug__proposals_get"];
+        put?: never;
+        /** Create Proposal */
+        post: operations["create_proposal_api_projects__project_slug__proposals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_slug}/proposals/{proposal_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Proposal Detail */
+        get: operations["get_proposal_detail_api_projects__project_slug__proposals__proposal_id__get"];
+        /** Update Proposal */
+        put: operations["update_proposal_api_projects__project_slug__proposals__proposal_id__put"];
+        post?: never;
+        /** Withdraw Proposal */
+        delete: operations["withdraw_proposal_api_projects__project_slug__proposals__proposal_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_slug}/proposals/{proposal_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Proposal */
+        post: operations["approve_proposal_api_projects__project_slug__proposals__proposal_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_slug}/proposals/{proposal_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject Proposal */
+        post: operations["reject_proposal_api_projects__project_slug__proposals__proposal_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -742,6 +813,10 @@ export interface components {
             scopes: string[];
             /** Expires At */
             expires_at: string | null;
+            /** Publish Direct */
+            publish_direct: boolean;
+            /** Purpose */
+            purpose: string | null;
             /**
              * Created At
              * Format: date-time
@@ -801,6 +876,13 @@ export interface components {
             scopes: string[];
             /** Expires In Days */
             expires_in_days?: number | null;
+            /**
+             * Publish Direct
+             * @default false
+             */
+            publish_direct: boolean;
+            /** Purpose */
+            purpose?: string | null;
         };
         /**
          * CreateAPITokenResponse
@@ -818,6 +900,10 @@ export interface components {
             scopes: string[];
             /** Expires At */
             expires_at: string | null;
+            /** Publish Direct */
+            publish_direct: boolean;
+            /** Purpose */
+            purpose: string | null;
             /**
              * Created At
              * Format: date-time
@@ -895,6 +981,52 @@ export interface components {
              * @default []
              */
             taxonomy_environments: string[];
+        };
+        /** ProposalAction */
+        ProposalAction: {
+            /** Comment */
+            comment?: string | null;
+        };
+        /** ProposalCreate */
+        ProposalCreate: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "testcase" | "shared_step" | "story";
+            /** Content Id */
+            content_id?: string | null;
+            /** Source Path */
+            source_path: string;
+            /** Base Revision */
+            base_revision: string;
+            /** Proposed Title */
+            proposed_title: string;
+            /** Proposed Body */
+            proposed_body: {
+                [key: string]: unknown;
+            };
+            /**
+             * Proposal Action
+             * @default upsert
+             * @enum {string}
+             */
+            proposal_action: "upsert" | "delete";
+            /** Summary */
+            summary?: string | null;
+        };
+        /** ProposalUpdate */
+        ProposalUpdate: {
+            /** Proposed Title */
+            proposed_title?: string | null;
+            /** Proposed Body */
+            proposed_body?: {
+                [key: string]: unknown;
+            } | null;
+            /** Summary */
+            summary?: string | null;
+            /** Base Revision */
+            base_revision: string;
         };
         /** RefreshRequest */
         RefreshRequest: {
@@ -2353,6 +2485,251 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_proposals_api_projects__project_slug__proposals_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                kind?: string | null;
+                author_user_id?: string | null;
+                author_kind?: string | null;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                project_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_proposal_api_projects__project_slug__proposals_post: {
+        parameters: {
+            query?: {
+                auto_approve?: boolean;
+            };
+            header?: never;
+            path: {
+                project_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_proposal_detail_api_projects__project_slug__proposals__proposal_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+                project_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_proposal_api_projects__project_slug__proposals__proposal_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+                project_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    withdraw_proposal_api_projects__project_slug__proposals__proposal_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+                project_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_proposal_api_projects__project_slug__proposals__proposal_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+                project_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalAction"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_proposal_api_projects__project_slug__proposals__proposal_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+                project_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalAction"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
