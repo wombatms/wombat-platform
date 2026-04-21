@@ -1,0 +1,66 @@
+# Demo content fixture for E2E tests.
+# Ingested via `wombat sync` against the e2e-project.
+# This file provides deterministic content for smoke tests.
+
+- wombat_id: "TC-AUTH-001"
+  title: "User can log in with valid credentials"
+  kind: testcase
+  component: auth
+  priority: high
+  tags: [smoke, login, auth]
+  automation: automated
+  body: |
+    ## Description
+    Verify that a registered user can log in with valid email and password.
+
+    ## Steps
+    1. Navigate to `/login`
+    2. Enter valid email address
+    3. Enter valid password
+    4. Click "Sign in"
+
+    ## Expected
+    User is redirected to the project library.
+
+- wombat_id: "TC-AUTH-002"
+  title: "Login fails with invalid password"
+  kind: testcase
+  component: auth
+  priority: high
+  tags: [auth, negative]
+  automation: automated
+  body: |
+    ## Description
+    Verify that login with an incorrect password shows an error.
+
+    ## Steps
+    1. Navigate to `/login`
+    2. Enter valid email
+    3. Enter wrong password
+    4. Click "Sign in"
+
+    ## Expected
+    Error message "Invalid email or password" is displayed.
+
+- wombat_id: "TC-SEARCH-001"
+  title: "Hybrid search returns relevant results"
+  kind: testcase
+  component: search
+  priority: med
+  tags: [search, smoke]
+  automation: automated
+  body: |
+    ## Description
+    Verify that the hybrid search mode returns results combining keyword and
+    semantic matching.
+
+    ## Steps
+    1. Open the command palette (⌘K)
+    2. Type a query with at least 3 characters
+    3. Observe results
+
+    ## Expected
+    Results appear within 2 seconds, grouped by kind.
+
+    ## Shared Steps
+    See [[SS-NAV-001]] for navigation prerequisites.

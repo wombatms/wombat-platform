@@ -17,3 +17,6 @@ apps/*/test-results/
 apps/*/*.tsbuildinfo
 apps/*/vite.config.d.ts
 apps/*/vite.config.js
+
+# Playwright auth state (contains real tokens — never commit)
+apps/*/tests/e2e/.auth/*.json

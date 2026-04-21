@@ -1,0 +1,16 @@
+# Story fixtures for E2E tests.
+
+- wombat_id: "ST-AUTH-001"
+  title: "User Authentication Flow"
+  kind: story
+  tags: [auth, smoke]
+  body: |
+    ## As a user
+    I want to log in with my credentials
+    So that I can access the test management platform
+
+    ## Acceptance Criteria
+    - Login with valid credentials succeeds
+    - Login with invalid credentials shows error
+    - Session persists across page reloads
+    - Logout clears session

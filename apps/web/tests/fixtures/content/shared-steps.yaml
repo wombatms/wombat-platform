@@ -1,0 +1,11 @@
+# Shared-step fixtures for E2E tests.
+
+- wombat_id: "SS-NAV-001"
+  title: "Navigate to the Wombat application"
+  kind: shared_step
+  tags: [navigation, smoke]
+  body: |
+    ## Steps
+    1. Open browser
+    2. Navigate to the application URL
+    3. Verify the login page or library is visible
