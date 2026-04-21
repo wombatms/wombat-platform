@@ -1,3 +1,4 @@
+import type { FormEvent, KeyboardEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,7 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [flashMsg, setFlashMsg] = useState<string | null>(
+  const [flashMsg] = useState<string | null>(
     locationState?.flash ?? (locationState?.registered ? "Account created — please sign in." : null),
   );
   const [capsLock, setCapsLock] = useState(false);
@@ -58,11 +59,11 @@ export function LoginPage() {
     void detectBootstrap().then((isBootstrap) => setShowBootstrapLink(isBootstrap));
   }, []);
 
-  const handleCapsLock = (e: React.KeyboardEvent) => {
+  const handleCapsLock = (e: KeyboardEvent) => {
     setCapsLock(e.getModifierState("CapsLock"));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setSubmitting(true);
@@ -130,7 +131,6 @@ export function LoginPage() {
                 id="email"
                 type="email"
                 autoComplete="email"
-                autoFocus
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}

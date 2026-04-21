@@ -1,3 +1,4 @@
+import type { FormEvent } from "react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ export function RegisterPage() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
@@ -103,7 +104,7 @@ export function RegisterPage() {
                 id="email"
                 type="email"
                 autoComplete="email"
-                autoFocus
+  
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}

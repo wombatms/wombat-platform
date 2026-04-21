@@ -65,7 +65,7 @@ export function ProjectPickerPage() {
           </p>
         </div>
       ) : (
-        <ul className="space-y-3" role="list">
+        <ul className="space-y-3">
           {projects.map((project) => (
             <li key={project.id}>
               <button
