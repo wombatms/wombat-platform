@@ -21,6 +21,8 @@ class Config:
     openai_api_key: str | None = None
     # Working dir for cloned external source repos for RAG
     sources_root: str = ".wombat/sources"
+    # Working dir for per-project Git working clones used by the publisher
+    git_workspace_root: str = ".wombat/workspace"
 
 
 @lru_cache
@@ -40,4 +42,7 @@ def get_config() -> Config:
         embedder_model=os.environ.get("WOMBAT_EMBEDDER_MODEL", "bge-small-en-v1.5"),
         openai_api_key=os.environ.get("OPENAI_API_KEY"),
         sources_root=os.environ.get("WOMBAT_SOURCES_ROOT", ".wombat/sources"),
+        git_workspace_root=os.environ.get(
+            "WOMBAT_GIT_WORKSPACE_ROOT", ".wombat/workspace"
+        ),
     )
