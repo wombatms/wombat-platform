@@ -63,6 +63,9 @@ class ProjectDB(Base):
     default_owner: Mapped[str | None] = mapped_column(String, nullable=True)
     taxonomy_components: Mapped[list[str]] = mapped_column(JSON, default=list)
     taxonomy_environments: Mapped[list[str]] = mapped_column(JSON, default=list)
+    # SP3.2: Git remote URL for the project's canonical test-content repository.
+    # Used by the publisher to clone / push approved proposals.
+    git_url: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -130,6 +133,10 @@ class Content(Base):
     source_path: Mapped[str] = mapped_column(String)
     source_revision: Mapped[str] = mapped_column(String)
     content_hash: Mapped[str] = mapped_column(String)
+
+    # SP3.2: set True when publisher writes a new file but reindex fails, so that
+    # the background embedder knows to re-embed this row on its next pass.
+    stale_embedding: Mapped[bool] = mapped_column(default=False)
 
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -747,3 +747,162 @@ class Repository:
             sa_delete(ProposalDB).where(ProposalDB.project_id == project_id)
         )
         await self.session.flush()
+
+    async def get_user(self, user_id: uuid.UUID) -> UserDB | None:
+        """Fetch a user by primary key (used by publisher to look up the proposal author)."""
+        return await self.session.get(UserDB, user_id)
+
+    async def get_content(self, content_id: uuid.UUID) -> Content | None:
+        """Fetch a Content row by primary key."""
+        return await self.session.get(Content, content_id)
+
+    # --- Publisher helpers (SP3.2) -----------------------------------------------
+
+    async def upsert_content_from_proposal(
+        self,
+        *,
+        project_id: uuid.UUID,
+        proposal: ProposalDB,
+        published_sha: str,
+        mutated_body: dict,
+    ) -> Content | None:
+        """Upsert the Content row that corresponds to a published proposal.
+
+        For `delete` proposals we soft-delete the existing row (if any) and
+        return None. For `upsert` proposals we create-or-update using the same
+        path-keyed logic as the sync pipeline.
+
+        The publisher does NOT generate an embedding; it sets stale_embedding=True
+        so the background embedder queues the row for re-embedding. If reindex
+        succeeds inline (via ``reindex_content``), the caller clears the flag.
+        """
+        from datetime import UTC
+
+        if proposal.proposal_action == "delete":
+            # Soft-delete any existing content row at this path.
+            q = select(Content).where(
+                and_(
+                    Content.project_id == project_id,
+                    Content.source_path == proposal.source_path,
+                    Content.deleted_at.is_(None),
+                )
+            )
+            existing = (await self.session.execute(q)).scalar_one_or_none()
+            if existing is not None:
+                existing.deleted_at = datetime.now(UTC)
+                await self.session.flush()
+            return None
+
+        # Upsert path: build body from mutated_body
+        body = mutated_body
+        h = content_hash_for(body)
+        title = proposal.proposed_title
+
+        # Extract wombat_id from frontmatter if present
+        wombat_id: str | None = None
+        if isinstance(body.get("frontmatter"), dict):
+            wombat_id = body["frontmatter"].get("id") or proposal.source_path
+
+        q = select(Content).where(
+            and_(
+                Content.project_id == project_id,
+                Content.source_path == proposal.source_path,
+            )
+        )
+        existing = (await self.session.execute(q)).scalar_one_or_none()
+
+        if existing is None:
+            row = Content(
+                project_id=project_id,
+                kind=proposal.kind,
+                wombat_id=wombat_id,
+                title=title,
+                tags=[],
+                body=body,
+                source_repo="test-repo",
+                source_path=proposal.source_path,
+                source_revision=published_sha,
+                content_hash=h,
+                stale_embedding=True,
+                synced_at=datetime.now(UTC),
+            )
+            self.session.add(row)
+            await self.session.flush()
+            return row
+
+        existing.kind = proposal.kind
+        existing.wombat_id = wombat_id
+        existing.title = title
+        existing.body = body
+        existing.source_revision = published_sha
+        existing.content_hash = h
+        existing.stale_embedding = True
+        existing.synced_at = datetime.now(UTC)
+        existing.deleted_at = None
+        await self.session.flush()
+        return existing
+
+    async def reindex_content(
+        self,
+        *,
+        project_id: uuid.UUID,
+        source_path: str,
+    ) -> None:
+        """Re-embed a single content row by source_path.
+
+        Delegates to the Indexer pipeline to compute a fresh embedding and
+        write it back. Clears stale_embedding on success.
+
+        This is a best-effort call from the publisher. If the embedder is not
+        available (e.g. in unit tests), this will raise ImportError or similar;
+        the publisher catches that and falls back to mark_content_stale_embedding.
+        """
+        from wombat_core.rag.embedders import load_embedder  # type: ignore
+
+        embedder = load_embedder()
+
+        q = select(Content).where(
+            and_(
+                Content.project_id == project_id,
+                Content.source_path == source_path,
+                Content.deleted_at.is_(None),
+            )
+        )
+        row = (await self.session.execute(q)).scalar_one_or_none()
+        if row is None:
+            return
+
+        from wombat_api.sync.indexer import _embed_text_for
+
+        parsed = {
+            "kind": row.kind,
+            "title": row.title,
+            "body": row.body,
+        }
+        text = _embed_text_for(parsed)
+        vectors = await embedder.embed_batch([text])
+        row.embedding = vectors[0]
+        row.stale_embedding = False
+        await self.session.flush()
+
+    async def mark_content_stale_embedding(
+        self,
+        *,
+        project_id: uuid.UUID,
+        source_path: str,
+    ) -> None:
+        """Set stale_embedding=True on the content row at source_path.
+
+        Called when inline reindex fails so the background embedder can
+        pick up the row on its next pass.
+        """
+        await self.session.execute(
+            sa_update(Content)
+            .where(
+                and_(
+                    Content.project_id == project_id,
+                    Content.source_path == source_path,
+                )
+            )
+            .values(stale_embedding=True)
+        )
