@@ -193,3 +193,25 @@ def serialise_entity(entity: WombatEntity) -> str:
 def write_entity(entity: WombatEntity, path: Path) -> None:
     """Write *entity* to *path* in its canonical format."""
     path.write_text(serialise_entity(entity), encoding="utf-8")
+
+
+def write_canonical_file(path: Path, body: dict) -> None:
+    """Write a ``{"frontmatter": dict, "markdown": str}`` body to *path*.
+
+    This is the inverse of the parser's raw-dict representation used by the
+    proposal system. The frontmatter block is serialised as YAML with the
+    wombat dumper; the markdown body is appended verbatim after the closing
+    ``---`` delimiter.
+
+    For typed domain objects use :func:`write_entity` instead.
+    """
+    fm = body.get("frontmatter") or {}
+    md = body.get("markdown") or ""
+    content = "---\n"
+    content += _dump_yaml(fm)
+    content += "---\n"
+    if md:
+        content += md
+        if not md.endswith("\n"):
+            content += "\n"
+    path.write_text(content, encoding="utf-8")
