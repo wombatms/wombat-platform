@@ -1,4 +1,4 @@
-import createClient from "openapi-fetch";
+import createClient, { type Middleware } from "openapi-fetch";
 import type { paths } from "./schema";
 import { ApiError, type ApiErrorEnvelope } from "./errors";
 import { getAccessToken, clearTokens } from "@/lib/auth/storage";
@@ -24,33 +24,36 @@ async function parseErrorEnvelope(res: Response): Promise<ApiErrorEnvelope> {
   return envelope;
 }
 
-export const api = createClient<paths>({
-  baseUrl,
-  fetch: async (input, init) => {
-    const headers = new Headers(init?.headers);
+const authMiddleware: Middleware = {
+  async onRequest({ request }) {
     const token = getAccessToken();
-    if (token && !headers.has("Authorization")) {
-      headers.set("Authorization", `Bearer ${token}`);
+    if (token && !request.headers.has("Authorization")) {
+      request.headers.set("Authorization", `Bearer ${token}`);
     }
-    if (!headers.has("Accept")) headers.set("Accept", "application/json");
+    if (!request.headers.has("Accept")) {
+      request.headers.set("Accept", "application/json");
+    }
+    return request;
+  },
 
-    const res = await fetch(input, { ...init, headers });
-
-    if (res.status === 401) {
+  async onResponse({ response, request }) {
+    if (response.status === 401) {
       // Attempt token refresh then retry once
       try {
         const newToken = await refreshTokens();
-        const retryHeaders = new Headers(init?.headers);
-        retryHeaders.set("Authorization", `Bearer ${newToken}`);
-        retryHeaders.set("Accept", "application/json");
-        const retryRes = await fetch(input, { ...init, headers: retryHeaders });
+        const retryRequest = new Request(request, {
+          headers: (() => {
+            const h = new Headers(request.headers);
+            h.set("Authorization", `Bearer ${newToken}`);
+            return h;
+          })(),
+        });
+        const retryRes = await fetch(retryRequest);
         if (!retryRes.ok) {
           throw new ApiError(retryRes.status, await parseErrorEnvelope(retryRes));
         }
         return retryRes;
       } catch (refreshErr) {
-        // If refresh failed, clearTokens was already called in refreshTokens()
-        // Re-throw as ApiError(401) if it isn't one already
         if (refreshErr instanceof ApiError) throw refreshErr;
         clearTokens();
         throw new ApiError(401, {
@@ -62,10 +65,13 @@ export const api = createClient<paths>({
       }
     }
 
-    if (!res.ok) {
-      throw new ApiError(res.status, await parseErrorEnvelope(res));
+    if (!response.ok) {
+      throw new ApiError(response.status, await parseErrorEnvelope(response));
     }
 
-    return res;
+    return response;
   },
-});
+};
+
+export const api = createClient<paths>({ baseUrl });
+api.use(authMiddleware);
