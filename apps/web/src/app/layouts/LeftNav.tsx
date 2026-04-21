@@ -7,7 +7,10 @@ import {
   BookMarked,
   Search,
   Settings,
+  GitPullRequest,
 } from "lucide-react";
+import { useInboxBadge } from "@/features/proposals/api";
+import { usePermission } from "@/features/auth/useSession";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -16,6 +19,7 @@ interface NavItem {
   to: string;
   key: string;
   disabled?: boolean;
+  badge?: number;
 }
 
 function useNavItems(projectSlug: string | undefined): {
@@ -24,12 +28,23 @@ function useNavItems(projectSlug: string | undefined): {
 } {
   const base = projectSlug ? `/p/${projectSlug}` : "";
   const noProject = !projectSlug;
+  const canPropose = usePermission(projectSlug ?? "", "content:propose");
+  const { data: inboxCount } = useInboxBadge(projectSlug ?? "");
 
   const primary: NavItem[] = [
     { key: "library", label: "Test Library", icon: BookOpen, to: `${base}/library`, disabled: noProject },
     { key: "shared-steps", label: "Shared Steps", icon: Share2, to: `${base}/shared-steps`, disabled: noProject },
     { key: "stories", label: "Stories", icon: BookMarked, to: `${base}/stories`, disabled: noProject },
     { key: "search", label: "Search", icon: Search, to: `${base}/search`, disabled: noProject },
+    ...(canPropose && !noProject
+      ? [{
+          key: "approvals",
+          label: "Approvals",
+          icon: GitPullRequest,
+          to: `${base}/approvals`,
+          badge: inboxCount && inboxCount > 0 ? inboxCount : undefined,
+        }]
+      : []),
   ];
 
   const secondary: NavItem[] = [
@@ -74,7 +89,19 @@ function NavItemLink({ item }: { item: NavItem }) {
       {({ isActive }: { isActive: boolean }) => (
         <>
           <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>{item.label}</span>
+          <span className="flex-1">{item.label}</span>
+          {item.badge !== undefined && (
+            <span
+              className="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full px-1 text-[10px] font-bold tabular-nums"
+              style={{
+                background: "var(--accent-primary)",
+                color: isActive ? "var(--bg-app)" : "var(--bg-app)",
+              }}
+              aria-label={`${item.badge} open proposals`}
+            >
+              {item.badge > 99 ? "99+" : item.badge}
+            </span>
+          )}
           {isActive && <span className="sr-only">(current page)</span>}
         </>
       )}
