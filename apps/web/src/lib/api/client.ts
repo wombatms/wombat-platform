@@ -15,8 +15,22 @@ async function parseErrorEnvelope(res: Response): Promise<ApiErrorEnvelope> {
   };
   try {
     const body = (await res.clone().json()) as Record<string, unknown>;
+    // Wombat envelope: { error: { code, message, field, hint } }
     if (body?.error && typeof body.error === "object") {
       return body.error as ApiErrorEnvelope;
+    }
+    // FastAPI HTTPException with structured detail object: { detail: { code, ... } }
+    // Used by proposals routes for 409 conflicts.
+    if (body?.detail && typeof body.detail === "object" && !Array.isArray(body.detail)) {
+      const detail = body.detail as Record<string, unknown>;
+      if (typeof detail["code"] === "string") {
+        return {
+          code: detail["code"],
+          message: (detail["message"] as string | undefined) ?? envelope.message,
+          field: (detail["field"] as string | null | undefined) ?? null,
+          hint: JSON.stringify(detail),
+        };
+      }
     }
   } catch {
     /* non-JSON error bodies — keep default envelope */
