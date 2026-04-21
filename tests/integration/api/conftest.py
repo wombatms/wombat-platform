@@ -329,3 +329,79 @@ async def users(
 
     await db_session.commit()
     return result
+
+
+# ---------------------------------------------------------------------------
+# SP3.2: temp_git_project — provisions a bare remote + working clone
+# ---------------------------------------------------------------------------
+
+
+@pytest_asyncio.fixture
+async def temp_git_project(tmp_path_factory, monkeypatch, db_session: AsyncSession):
+    """Provision a temp bare remote + working clone; wire into git_workspace_root
+    and the project's git_url; return (ProjectDB, clone_root, remote_path).
+
+    Git identity: set GIT_AUTHOR_* / GIT_COMMITTER_* env vars so commits succeed
+    even when the system has no global git config.
+    """
+    import subprocess
+
+    # Wire up a dummy git identity so commits don't fail on bare systems.
+    monkeypatch.setenv("GIT_AUTHOR_NAME", "Wombat Test")
+    monkeypatch.setenv("GIT_AUTHOR_EMAIL", "test@wombat.example")
+    monkeypatch.setenv("GIT_COMMITTER_NAME", "Wombat Test")
+    monkeypatch.setenv("GIT_COMMITTER_EMAIL", "test@wombat.example")
+
+    remote = tmp_path_factory.mktemp("remote")
+    subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+
+    # Seed the bare remote with an initial main commit.
+    seed = tmp_path_factory.mktemp("seed")
+    subprocess.run(["git", "-C", str(seed), "init"], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(seed), "commit", "--allow-empty", "-m", "init"],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(seed), "branch", "-M", "main"],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(seed), "remote", "add", "origin", str(remote)],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(seed), "push", "origin", "main"],
+        check=True,
+        capture_output=True,
+    )
+
+    workspace = tmp_path_factory.mktemp("workspace")
+    monkeypatch.setenv("WOMBAT_GIT_WORKSPACE_ROOT", str(workspace))
+
+    # Clear the lru_cache so new config is picked up.
+    from wombat_api.config import get_config
+
+    get_config.cache_clear()
+
+    # Insert project with git_url pointing at the bare remote.
+    from wombat_api.database.models import ProjectDB
+
+    project = ProjectDB(
+        id=uuid.uuid4(),
+        slug=f"tmp-{uuid.uuid4().hex[:8]}",
+        name="Tmp Git Project",
+        org="test-org",
+        git_url=str(remote),
+    )
+    db_session.add(project)
+    await db_session.flush()
+    await db_session.commit()
+
+    yield project, workspace, remote
+
+    # Restore config cache state so subsequent tests start fresh.
+    get_config.cache_clear()
