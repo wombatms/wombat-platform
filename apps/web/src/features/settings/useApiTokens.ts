@@ -7,6 +7,8 @@ export interface ApiToken {
   name: string;
   scopes: string[];
   expires_at: string | null;
+  publish_direct: boolean;
+  purpose: string | null;
   created_at: string;
 }
 
@@ -14,6 +16,15 @@ export interface CreateTokenRequest {
   name: string;
   scopes: string[];
   expires_in_days?: number | null;
+  /**
+   * When true the token grants content:publish_direct. Requires `purpose`.
+   */
+  publish_direct?: boolean;
+  /**
+   * Human-readable description of why this token needs direct-publish access.
+   * Required by the backend when publish_direct=true.
+   */
+  purpose?: string | null;
 }
 
 export interface CreateTokenResponse extends ApiToken {
@@ -36,7 +47,13 @@ export function useCreateToken() {
   return useMutation({
     mutationFn: async (req: CreateTokenRequest): Promise<CreateTokenResponse> => {
       const { data, error } = await api.POST("/api/auth/api-tokens", {
-        body: req,
+        body: {
+          name: req.name,
+          scopes: req.scopes,
+          expires_in_days: req.expires_in_days,
+          publish_direct: req.publish_direct ?? false,
+          purpose: req.purpose,
+        },
       });
       if (error) throw error;
       return data as CreateTokenResponse;
