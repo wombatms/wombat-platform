@@ -116,6 +116,11 @@ async def create_proposal(
             detail={"purpose": principal.token.purpose if principal.token else None},
         )
         await session.commit()
+        # Refresh is required because `updated_at` uses `onupdate=func.now()`
+        # which SQLAlchemy marks as expired after the ORM flush/commit cycle.
+        # Without refresh, accessing `proposal.updated_at` triggers a lazy-load
+        # in an async context, raising MissingGreenlet.
+        await session.refresh(proposal)
         return {
             "data": {
                 "proposal": _proposal_to_response(proposal).model_dump(),
@@ -124,6 +129,7 @@ async def create_proposal(
         }
 
     await session.commit()
+    await session.refresh(proposal)
     return {"data": {"proposal": _proposal_to_response(proposal).model_dump()}}
 
 
@@ -294,6 +300,7 @@ async def approve_proposal(
         comment=body.comment,
     )
     await session.commit()
+    await session.refresh(proposal)
     return {
         "data": {
             "proposal": _proposal_to_response(proposal).model_dump(),
