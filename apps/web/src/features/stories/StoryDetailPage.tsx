@@ -1,12 +1,16 @@
 import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { Clock, Info } from "lucide-react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { Clock, Info, Pencil } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppBreadcrumb } from "@/components/shared/AppBreadcrumb";
 import { MarkdownBody } from "@/components/shared/MarkdownBody";
 import { LinkedEntityRef } from "@/components/shared/LinkedEntityRef";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { PendingProposalBanner } from "@/components/shared/PendingProposalBanner";
 import { useStoryDetail } from "./useStoryDetail";
+import { useProposals } from "@/features/proposals/api";
+import { usePermission } from "@/features/auth/useSession";
+import { useShortcut } from "@/lib/shortcuts/useShortcut";
 import { cn } from "@/lib/utils";
 
 function DetailSkeleton() {
@@ -28,7 +32,16 @@ function DetailSkeleton() {
 
 export function StoryDetailPage() {
   const { projectSlug = "", wombatId = "" } = useParams<{ projectSlug: string; wombatId: string }>();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
+
+  const canPropose = usePermission(projectSlug, "content:propose");
+  const { data: proposalsData } = useProposals(projectSlug, { content_id: wombatId, status: "open", limit: 1 });
+  const openProposal = proposalsData?.data?.[0] ?? null;
+
+  useShortcut("e", () => {
+    if (canPropose && !openProposal) navigate(`/p/${projectSlug}/story/${wombatId}/edit`);
+  }, { enabled: Boolean(canPropose && !openProposal) });
 
   const { data: story, isLoading, isError, error, refetch } = useStoryDetail(projectSlug, wombatId);
 
@@ -88,10 +101,40 @@ export function StoryDetailPage() {
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px]"
-          style={{ background: "var(--feedback-info-bg)", color: "var(--feedback-info-fg)", border: "1px solid color-mix(in srgb, var(--feedback-info-fg) 20%, transparent)" }}>
-          <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          Read-only phase — editing comes in SP3.2.
+        {openProposal && (
+          <PendingProposalBanner
+            proposalId={openProposal.id}
+            authorName={openProposal.author_user_id}
+            ageIso={openProposal.created_at}
+            projectSlug={projectSlug}
+          />
+        )}
+
+        <div className="flex items-center gap-2">
+          {canPropose ? (
+            <button
+              type="button"
+              disabled={Boolean(openProposal)}
+              onClick={() => navigate(`/p/${projectSlug}/story/${wombatId}/edit`)}
+              title={openProposal ? "A proposal is already open" : "Edit this story"}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-3 h-7 text-[12px] font-medium",
+                "transition-colors duration-100 outline-none",
+                "focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)]",
+                "disabled:opacity-50 disabled:cursor-not-allowed",
+              )}
+              style={{ background: "var(--bg-surface-2)", color: "var(--fg-muted)", border: "1px solid var(--border-default)" }}
+            >
+              <Pencil className="h-3 w-3" aria-hidden="true" />
+              {openProposal ? "Edit (proposal pending)" : "Edit"}
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px]"
+              style={{ background: "var(--feedback-info-bg)", color: "var(--feedback-info-fg)", border: "1px solid color-mix(in srgb, var(--feedback-info-fg) 20%, transparent)" }}>
+              <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              Read-only — you do not have permission to propose changes.
+            </div>
+          )}
         </div>
       </header>
 

@@ -1,6 +1,6 @@
 import { type ComponentType, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { Info, Clock, GitBranch, User, ExternalLink } from "lucide-react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { Info, Clock, GitBranch, User, ExternalLink, Pencil } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppBreadcrumb } from "@/components/shared/AppBreadcrumb";
 import { MarkdownBody } from "@/components/shared/MarkdownBody";
@@ -8,8 +8,12 @@ import { StepTable } from "@/components/shared/StepTable";
 import { LinkedEntityRef } from "@/components/shared/LinkedEntityRef";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { PriorityBadge, AutomationBadge } from "@/components/shared/ResourceBadge";
+import { PendingProposalBanner } from "@/components/shared/PendingProposalBanner";
 import type { ResourcePriority, ResourceAutomation } from "@/components/shared/ResourceBadge";
 import { useTestcaseDetail } from "./useTestcaseDetail";
+import { useProposals } from "@/features/proposals/api";
+import { usePermission } from "@/features/auth/useSession";
+import { useShortcut } from "@/lib/shortcuts/useShortcut";
 import { cn } from "@/lib/utils";
 
 /* ------------------------------------------------------------------ */
@@ -84,8 +88,18 @@ export function TestcaseDetailPage() {
     projectSlug: string;
     wombatId: string;
   }>();
+  const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState("overview");
+
+  const canPropose = usePermission(projectSlug, "content:propose");
+
+  // Check for an open proposal on this content item
+  const { data: proposalsData } = useProposals(
+    projectSlug,
+    { content_id: wombatId, status: "open", limit: 1 },
+  );
+  const openProposal = proposalsData?.data?.[0] ?? null;
 
   const {
     testcase: tc,
@@ -95,6 +109,11 @@ export function TestcaseDetailPage() {
     refetch,
     resolveSharedStep,
   } = useTestcaseDetail(projectSlug, wombatId);
+
+  // e — edit shortcut
+  useShortcut("e", () => {
+    if (canPropose && !openProposal) navigate(`/p/${projectSlug}/testcase/${wombatId}/edit`);
+  }, { enabled: Boolean(canPropose && !openProposal) });
 
   if (isLoading) return <DetailSkeleton />;
   if (isError) return <ErrorState error={error} onRetry={() => void refetch()} className="m-6" />;
@@ -166,17 +185,52 @@ export function TestcaseDetailPage() {
           )}
         </div>
 
-        {/* Read-only notice */}
-        <div
-          className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px]"
-          style={{
-            background: "var(--feedback-info-bg)",
-            color: "var(--feedback-info-fg)",
-            border: "1px solid color-mix(in srgb, var(--feedback-info-fg) 20%, transparent)",
-          }}
-        >
-          <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          Read-only phase — editing comes in SP3.2.
+        {/* Pending proposal banner */}
+        {openProposal && (
+          <PendingProposalBanner
+            proposalId={openProposal.id}
+            authorName={openProposal.author_user_id}
+            ageIso={openProposal.created_at}
+            projectSlug={projectSlug}
+          />
+        )}
+
+        {/* Edit button / read-only notice */}
+        <div className="flex items-center gap-2">
+          {canPropose ? (
+            <button
+              type="button"
+              disabled={Boolean(openProposal)}
+              onClick={() => navigate(`/p/${projectSlug}/testcase/${wombatId}/edit`)}
+              title={openProposal ? "A proposal is already open" : "Edit this testcase"}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-3 h-7 text-[12px] font-medium",
+                "transition-colors duration-100 outline-none",
+                "focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)]",
+                "disabled:opacity-50 disabled:cursor-not-allowed",
+              )}
+              style={{
+                background: "var(--bg-surface-2)",
+                color: "var(--fg-muted)",
+                border: "1px solid var(--border-default)",
+              }}
+            >
+              <Pencil className="h-3 w-3" aria-hidden="true" />
+              {openProposal ? "Edit (proposal pending)" : "Edit"}
+            </button>
+          ) : (
+            <div
+              className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px]"
+              style={{
+                background: "var(--feedback-info-bg)",
+                color: "var(--feedback-info-fg)",
+                border: "1px solid color-mix(in srgb, var(--feedback-info-fg) 20%, transparent)",
+              }}
+            >
+              <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              Read-only — you do not have permission to propose changes.
+            </div>
+          )}
         </div>
       </header>
 
