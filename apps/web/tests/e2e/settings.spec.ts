@@ -118,9 +118,9 @@ test.describe("Project switching (AC #6)", () => {
     });
 
     // Track if there's a full page reload by listening for navigation events
-    let hardNavigationCount = 0;
+    let _hardNavigationCount = 0;
     page.on("framenavigated", (frame) => {
-      if (frame === page.mainFrame()) hardNavigationCount++;
+      if (frame === page.mainFrame()) _hardNavigationCount++;
     });
 
     // Open the project switcher

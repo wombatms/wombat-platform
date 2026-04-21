@@ -23,7 +23,8 @@ export interface WombatFixtures {
 
 export const test = base.extend<WombatFixtures>({
   /** Derive theme from the Playwright project name (chromium-light / chromium-dark). */
-  theme: async ({ }, use, testInfo) => {
+  // eslint-disable-next-line no-empty-pattern
+  theme: async ({}, use, testInfo) => {
     const projectName = testInfo.project.name;
     const theme: Theme = projectName.endsWith("dark") ? "dark" : "light";
     await use(theme);

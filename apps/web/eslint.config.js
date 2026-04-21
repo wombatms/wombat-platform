@@ -93,4 +93,25 @@ export default [
       "no-console": "off",
     },
   },
+  // Playwright E2E tests run in Node.js — relax browser-specific rules
+  {
+    files: ["tests/e2e/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.es2022,
+      },
+    },
+    rules: {
+      "no-console": "off",
+      // Playwright fixtures use unconventional function signatures — disable
+      // react-hooks rules that don't apply outside React components
+      "react-hooks/rules-of-hooks": "off",
+      "react-hooks/exhaustive-deps": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+    },
+  },
 ];

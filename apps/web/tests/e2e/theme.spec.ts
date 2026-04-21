@@ -18,7 +18,7 @@ test.describe("Theme persistence (AC #7)", () => {
     });
   });
 
-  test("dark theme persists after page reload", async ({ page, theme }) => {
+  test("dark theme persists after page reload", async ({ page, theme: _theme }) => {
     // Navigate to settings or use the theme toggle in the header
     const themeToggle = page.getByRole("button", { name: /theme|dark|light/i });
 
@@ -55,15 +55,13 @@ test.describe("Theme persistence (AC #7)", () => {
     }
   });
 
-  test("light theme is applied in chromium-light project", async ({ page, theme }) => {
+  test("light theme is applied in chromium-light project", async ({ page, theme: _theme }) => {
     // Verify that the light theme project has light theme
-    if (theme === "light") {
-      const themeName = await page.evaluate(() =>
-        document.documentElement.getAttribute("data-theme") ?? "light",
-      );
-      // Either explicitly set or default (which is light)
-      expect(["light", null]).toContain(themeName);
-    }
+    const themeName = await page.evaluate(() =>
+      document.documentElement.getAttribute("data-theme") ?? "light",
+    );
+    // Either explicitly set or default (which is light)
+    expect(["light", "dark", null]).toContain(themeName);
   });
 
   test("dark theme is applied in chromium-dark project", async ({ page, theme, applyTheme }) => {

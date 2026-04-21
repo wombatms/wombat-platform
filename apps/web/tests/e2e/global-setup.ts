@@ -82,7 +82,7 @@ async function apiPost(path: string, body: unknown, token?: string) {
   return json;
 }
 
-async function apiGet(path: string, token?: string) {
+async function _apiGet(path: string, token?: string) {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
   });

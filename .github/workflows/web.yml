@@ -1,0 +1,330 @@
+name: Web CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - "packages/api/**"
+      - ".github/workflows/web.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - "packages/api/**"
+      - ".github/workflows/web.yml"
+
+env:
+  NODE_VERSION: "20"
+  PYTHON_VERSION: "3.12"
+  PNPM_VERSION: "9"
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────
+  # 1. Install — shared cache for all downstream jobs
+  # ─────────────────────────────────────────────────────────────────
+  install:
+    name: Install dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+          cache-dependency-path: "apps/web/pnpm-lock.yaml"
+
+      - name: Install Node dependencies
+        run: pnpm --filter web install --frozen-lockfile
+        working-directory: apps/web
+
+      - name: Cache node_modules
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            apps/web/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('apps/web/pnpm-lock.yaml') }}
+
+  # ─────────────────────────────────────────────────────────────────
+  # 2. Lint + Typecheck (parallel steps in one job)
+  # ─────────────────────────────────────────────────────────────────
+  lint-typecheck:
+    name: Lint & Typecheck
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            apps/web/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('apps/web/pnpm-lock.yaml') }}
+          fail-on-cache-miss: true
+
+      - name: Lint (ESLint)
+        run: pnpm --filter web lint
+        working-directory: .
+
+      - name: Typecheck (tsc --noEmit)
+        run: pnpm --filter web typecheck
+        working-directory: .
+
+  # ─────────────────────────────────────────────────────────────────
+  # 3. Unit tests (Vitest)
+  # ─────────────────────────────────────────────────────────────────
+  unit:
+    name: Unit tests
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            apps/web/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('apps/web/pnpm-lock.yaml') }}
+          fail-on-cache-miss: true
+
+      - name: Run Vitest
+        run: pnpm --filter web test
+        working-directory: .
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: apps/web/coverage/
+          if-no-files-found: ignore
+
+  # ─────────────────────────────────────────────────────────────────
+  # 4. Build + bundle budget check
+  # ─────────────────────────────────────────────────────────────────
+  build:
+    name: Build & bundle budget
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            apps/web/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('apps/web/pnpm-lock.yaml') }}
+          fail-on-cache-miss: true
+
+      - name: Build
+        run: pnpm --filter web build
+        working-directory: .
+        env:
+          VITE_API_BASE_URL: ""
+
+      - name: Bundle budget check (≤ 350 KB gzipped initial JS)
+        run: |
+          bash apps/web/scripts/check-bundle-budget.sh
+        working-directory: .
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist/
+
+  # ─────────────────────────────────────────────────────────────────
+  # 5. E2E tests (Playwright, light + dark)
+  # ─────────────────────────────────────────────────────────────────
+  e2e:
+    name: E2E tests (light + dark)
+    needs: [install, build]
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: wombat_test
+          POSTGRES_USER: wombat
+          POSTGRES_PASSWORD: wombat_test_pw
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      WOMBAT_TEST_DATABASE_URL: "postgresql+asyncpg://wombat:wombat_test_pw@localhost:5432/wombat_test"
+      WOMBAT_API_URL: "http://localhost:8000"
+      PLAYWRIGHT_BASE_URL: "http://localhost:4173"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            apps/web/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('apps/web/pnpm-lock.yaml') }}
+          fail-on-cache-miss: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python dependencies (API)
+        run: |
+          pip install uv
+          uv sync
+        working-directory: .
+
+      - name: Apply Alembic migrations
+        run: |
+          uv run alembic upgrade head
+        working-directory: .
+        env:
+          DATABASE_URL: "postgresql+asyncpg://wombat:wombat_test_pw@localhost:5432/wombat_test"
+
+      - name: Boot FastAPI server
+        run: |
+          uv run uvicorn wombat_api.app:app --host 0.0.0.0 --port 8000 &
+          # Wait for API to be ready
+          timeout 30 bash -c 'until curl -sf http://localhost:8000/openapi.json; do sleep 1; done'
+        env:
+          WOMBAT_DATABASE_URL: "postgresql+asyncpg://wombat:wombat_test_pw@localhost:5432/wombat_test"
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist/
+
+      - name: Install Playwright browsers
+        run: pnpm --filter web exec playwright install --with-deps chromium
+        working-directory: .
+
+      - name: Run Playwright tests
+        run: pnpm --filter web test:e2e
+        working-directory: .
+        env:
+          CI: "true"
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+
+  # ─────────────────────────────────────────────────────────────────
+  # 6. OpenAPI schema drift check
+  # ─────────────────────────────────────────────────────────────────
+  openapi-drift:
+    name: OpenAPI schema drift check
+    needs: install
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: wombat_test
+          POSTGRES_USER: wombat
+          POSTGRES_PASSWORD: wombat_test_pw
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      WOMBAT_DATABASE_URL: "postgresql+asyncpg://wombat:wombat_test_pw@localhost:5432/wombat_test"
+      VITE_API_BASE_URL: "http://localhost:8000"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            apps/web/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('apps/web/pnpm-lock.yaml') }}
+          fail-on-cache-miss: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python dependencies
+        run: |
+          pip install uv
+          uv sync
+        working-directory: .
+
+      - name: Apply Alembic migrations
+        run: uv run alembic upgrade head
+        working-directory: .
+
+      - name: Boot FastAPI server
+        run: |
+          uv run uvicorn wombat_api.app:app --host 0.0.0.0 --port 8000 &
+          timeout 30 bash -c 'until curl -sf http://localhost:8000/openapi.json; do sleep 1; done'
+
+      - name: Check OpenAPI schema drift
+        run: bash apps/web/scripts/check-openapi-drift.sh
+        working-directory: .

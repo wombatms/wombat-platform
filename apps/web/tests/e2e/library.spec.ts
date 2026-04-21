@@ -65,7 +65,6 @@ test.describe("Library list", () => {
 
     // Initially check preview pane state
     const previewPane = page.locator('[aria-label="Entity preview"]');
-    const previewButton = page.getByRole("button", { name: /preview pane/i });
 
     // Toggle preview pane open with p key
     // First ensure we're not in an input field

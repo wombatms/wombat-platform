@@ -37,6 +37,12 @@ export default defineConfig(({ mode }) => {
       globals: true,
       setupFiles: ["./src/tests/setup.ts"],
       css: true,
+      // Exclude Playwright E2E specs — they use @playwright/test, not Vitest.
+      exclude: [
+        "tests/e2e/**",
+        "**/node_modules/**",
+        "**/dist/**",
+      ],
     },
     // openapi-fetch constructs absolute URLs from VITE_API_BASE_URL + path.
     // In Node.js (where MSW's interceptor runs), relative URLs like /api/... are
