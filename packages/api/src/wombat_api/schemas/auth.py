@@ -68,5 +68,8 @@ class UserResponse(BaseModel):
     display_name: str
     is_active: bool
     created_at: datetime
+    # Permissions keyed by project slug — computed at /me time from role +
+    # token grant (publish_direct). Additive: never subtractive.
+    permissions_by_project: dict[str, list[str]] = {}
 
     model_config = {"from_attributes": True}

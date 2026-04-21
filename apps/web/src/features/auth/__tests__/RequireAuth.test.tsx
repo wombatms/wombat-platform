@@ -22,7 +22,7 @@ function makeQC() {
 function makeSession(overrides: Partial<SessionContextValue> = {}): SessionContextValue {
   return {
     status: "authed",
-    user: { id: "u1", email: "test@example.com", display_name: "Test", is_active: true, created_at: "" },
+    user: { id: "u1", email: "test@example.com", display_name: "Test", is_active: true, created_at: "", permissions_by_project: {} },
     login: vi.fn(),
     logout: vi.fn(),
     refreshUser: vi.fn(),

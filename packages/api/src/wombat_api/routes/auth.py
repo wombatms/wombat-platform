@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from wombat_api.auth.dependencies import get_current_user
+from wombat_api.auth.dependencies import get_current_user, get_principal
 from wombat_api.auth.jwt import (
     create_access_token,
     create_refresh_token,
@@ -31,6 +31,8 @@ from wombat_api.schemas.auth import (
     TokenResponse,
     UserResponse,
 )
+from wombat_api.rbac.models import Role
+from wombat_api.rbac.permissions import role_permissions
 from wombat_api.schemas.common import UserCreate
 
 router = APIRouter()
@@ -129,10 +131,42 @@ async def refresh(
 
 @router.get("/me", response_model=UserResponse)
 async def me(
-    user: UserDB = Depends(get_current_user),
-) -> UserDB:
-    """Return the authenticated user's profile."""
-    return user
+    principal=Depends(get_principal),
+    session: AsyncSession = Depends(get_session),
+) -> UserResponse:
+    """Return the authenticated user's profile, including per-project permissions.
+
+    permissions_by_project is computed from:
+    - The user's role on each project (role_permissions).
+    - Whether the acting token carries publish_direct (additive grant).
+
+    This is computed at request time; there is no RBAC cache on the frontend.
+    """
+    repo = Repository(session)
+    user: UserDB = principal.user
+    slug_roles = await repo.list_user_project_roles(user.id)
+
+    permissions_by_project: dict[str, list[str]] = {}
+    for slug, role_str in slug_roles:
+        try:
+            role = Role(role_str)
+        except ValueError:
+            continue
+        perms: set[str] = {str(p) for p in role_permissions(role)}
+        # Additive: if the acting token has publish_direct, grant it globally.
+        if principal.token is not None and principal.token.publish_direct:
+            from wombat_api.rbac.permissions import Permission  # local import to avoid circular
+            perms.add(str(Permission.CONTENT_PUBLISH_DIRECT))
+        permissions_by_project[slug] = sorted(perms)
+
+    return UserResponse(
+        id=user.id,
+        email=user.email,
+        display_name=user.display_name,
+        is_active=user.is_active,
+        created_at=user.created_at,
+        permissions_by_project=permissions_by_project,
+    )
 
 
 @router.post("/api-tokens", response_model=CreateAPITokenResponse, status_code=201)

@@ -4,6 +4,10 @@ export const FIXTURE_USER = {
   display_name: "Alice",
   is_active: true,
   created_at: "2024-01-01T00:00:00Z",
+  permissions_by_project: {
+    "alpha-project": ["content:propose", "content:publish_direct"],
+    "beta-project": ["content:propose"],
+  },
 };
 
 export const FIXTURE_USER_2 = {
@@ -31,6 +35,8 @@ export const FIXTURE_API_TOKEN = {
   name: "CI Token",
   scopes: ["read"],
   expires_at: null,
+  publish_direct: false,
+  purpose: null,
   created_at: "2024-01-01T00:00:00Z",
 };
 

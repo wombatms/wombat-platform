@@ -12,6 +12,12 @@ export interface User {
   display_name: string;
   is_active: boolean;
   created_at: string;
+  /**
+   * Permissions grouped by project slug, computed server-side from role +
+   * token publish_direct grant. Use usePermission(slug, perm) to query.
+   * Example: { "alpha-project": ["content:propose", "content:publish_direct"] }
+   */
+  permissions_by_project: Record<string, string[]>;
 }
 
 export type SessionStatus = "loading" | "authed" | "anonymous";

@@ -122,6 +122,17 @@ class Repository:
         )
         return list((await self.session.execute(q)).scalars())
 
+    async def list_user_project_roles(
+        self, user_id: uuid.UUID
+    ) -> list[tuple[str, str]]:
+        """Return (project_slug, role) pairs for all projects the user has a role on."""
+        q = (
+            select(ProjectDB.slug, UserProjectRoleDB.role)
+            .join(UserProjectRoleDB, UserProjectRoleDB.project_id == ProjectDB.id)
+            .where(UserProjectRoleDB.user_id == user_id)
+        )
+        return [(slug, role) for slug, role in (await self.session.execute(q)).all()]
+
     # --- Users / Auth / RBAC --------------------------------------------------
 
     async def get_user_by_email(self, email: str) -> UserDB | None:
