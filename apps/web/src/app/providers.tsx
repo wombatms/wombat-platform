@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/query/queryClient";
 import { ThemeProvider } from "@/lib/theme/ThemeProvider";
 import { AuthProvider } from "@/features/auth/AuthProvider";
+import { CommandPaletteProvider } from "@/features/search/CommandPaletteProvider";
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
@@ -15,7 +16,11 @@ export function Providers({ children }: { children: ReactNode }) {
     >
       <ThemeProvider>
         <QueryClientProvider client={queryClient}>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <CommandPaletteProvider>
+              {children}
+            </CommandPaletteProvider>
+          </AuthProvider>
         </QueryClientProvider>
       </ThemeProvider>
     </BrowserRouter>
