@@ -1,3 +1,12 @@
+export interface ProposalListFilters {
+  status?: string;
+  kind?: string;
+  author_user_id?: string;
+  author_kind?: string;
+  cursor?: string;
+  limit?: number;
+}
+
 export const keys = {
   auth: {
     me: ["auth", "me"] as const,
@@ -27,4 +36,15 @@ export const keys = {
   search: (slug: string, body: Record<string, unknown>) =>
     ["project", slug, "search", body] as const,
   tokens: ["auth", "tokens"] as const,
+  proposal: {
+    /** Matches the full list subtree — used by removeQueries when switching projects. */
+    all: (slug: string) => ["project", slug, "proposals"] as const,
+    list: (slug: string, filters: ProposalListFilters) =>
+      ["project", slug, "proposals", "list", filters] as const,
+    detail: (slug: string, id: string) =>
+      ["project", slug, "proposals", "detail", id] as const,
+    /** Inbox badge count — drives nav count with 30 s stale time. */
+    inboxBadge: (slug: string) =>
+      ["project", slug, "proposals", "inbox-badge"] as const,
+  },
 };
