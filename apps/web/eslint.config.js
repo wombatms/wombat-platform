@@ -18,6 +18,7 @@ export default [
       "test-results/",
       "vite.config.d.ts",
       "vite.config.js",
+      "playwright.config.d.ts",
       "*.tsbuildinfo",
     ],
   },
