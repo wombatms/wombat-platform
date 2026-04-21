@@ -38,5 +38,12 @@ export default defineConfig(({ mode }) => {
       setupFiles: ["./src/tests/setup.ts"],
       css: true,
     },
+    // openapi-fetch constructs absolute URLs from VITE_API_BASE_URL + path.
+    // In Node.js (where MSW's interceptor runs), relative URLs like /api/... are
+    // invalid. Hard-wire the base URL for tests so all requests are absolute and
+    // MSW can intercept them at http://localhost:8000/*.
+    define: {
+      "import.meta.env.VITE_API_BASE_URL": JSON.stringify("http://localhost:8000"),
+    },
   };
 });
