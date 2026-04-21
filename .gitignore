@@ -6,3 +6,11 @@ dist/
 .pytest_cache/
 .ruff_cache/
 uv.lock
+
+# Node / frontend
+node_modules/
+apps/*/dist/
+apps/*/.vite/
+apps/*/coverage/
+apps/*/playwright-report/
+apps/*/test-results/
