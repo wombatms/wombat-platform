@@ -3,6 +3,7 @@ export interface ProposalListFilters {
   kind?: string;
   author_user_id?: string;
   author_kind?: string;
+  content_id?: string;
   cursor?: string;
   limit?: number;
 }

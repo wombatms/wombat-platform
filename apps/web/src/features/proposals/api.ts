@@ -112,6 +112,7 @@ export function useProposals(slug: string, filters: ProposalListFilters = {}) {
               kind: filters.kind,
               author_user_id: filters.author_user_id,
               author_kind: filters.author_kind,
+              content_id: filters.content_id,
               cursor: filters.cursor,
               limit: filters.limit,
             },
