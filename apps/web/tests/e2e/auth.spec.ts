@@ -9,6 +9,7 @@
  */
 
 import { test, expect, SEED_USER, SEED_PROJECT_SLUG } from "./fixtures";
+import { axeScan } from "./axe.helper";
 
 test.describe("Authentication", () => {
   // These tests start without auth state (override storageState to empty)
@@ -17,6 +18,9 @@ test.describe("Authentication", () => {
   test("login success — navigates to library", async ({ page, applyTheme }) => {
     await page.goto("/login");
     await applyTheme();
+
+    // Axe scan the login page before filling the form
+    await axeScan(page);
 
     await page.fill('input[name="email"], input[type="email"]', SEED_USER.email);
     await page.fill('input[name="password"], input[type="password"]', SEED_USER.password);
@@ -50,6 +54,9 @@ test.describe("Session persistence", () => {
     await expect(page.getByRole("heading", { name: /test library/i })).toBeVisible({
       timeout: 10_000,
     });
+
+    // Axe scan the library page
+    await axeScan(page);
 
     // Reload the page
     await page.reload();

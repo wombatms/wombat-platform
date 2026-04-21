@@ -10,6 +10,7 @@
  */
 
 import { test, expect, SEED_PROJECT_SLUG } from "./fixtures";
+import { axeScan } from "./axe.helper";
 
 test.describe("Library list", () => {
   test.beforeEach(async ({ page }) => {
@@ -29,6 +30,9 @@ test.describe("Library list", () => {
     // At least one data row should be visible
     const rows = grid.locator('[role="row"][aria-selected]');
     await expect(rows.first()).toBeVisible({ timeout: 5_000 });
+
+    // Axe scan the library page
+    await axeScan(page);
   });
 
   test("j/k keyboard nav moves selection (AC #4)", async ({ page, applyTheme }) => {

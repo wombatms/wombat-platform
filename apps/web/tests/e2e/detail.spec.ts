@@ -9,6 +9,7 @@
  */
 
 import { test, expect, SEED_PROJECT_SLUG } from "./fixtures";
+import { axeScan } from "./axe.helper";
 
 // We use "TC-AUTH-001" which is the first seeded testcase
 const TESTCASE_ID = "TC-AUTH-001";
@@ -30,6 +31,9 @@ test.describe("Testcase detail (AC #3)", () => {
 
     // The wombat_id should be shown
     await expect(page.getByText(TESTCASE_ID)).toBeVisible({ timeout: 5_000 });
+
+    // Axe scan the detail page
+    await axeScan(page);
   });
 
   test("history tab is accessible", async ({ page, applyTheme }) => {

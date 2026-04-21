@@ -8,6 +8,7 @@
  */
 
 import { test, expect, SEED_PROJECT_SLUG } from "./fixtures";
+import { axeScan } from "./axe.helper";
 
 test.describe("Theme persistence (AC #7)", () => {
   test.beforeEach(async ({ page }) => {
@@ -72,6 +73,9 @@ test.describe("Theme persistence (AC #7)", () => {
         document.documentElement.getAttribute("data-theme"),
       );
       expect(themeName).toBe("dark");
+
+      // Axe scan under dark theme to verify AC #7 (both themes pass a11y)
+      await axeScan(page);
     }
   });
 });

@@ -11,6 +11,7 @@
  */
 
 import { test, expect, SEED_PROJECT_SLUG } from "./fixtures";
+import { axeScan } from "./axe.helper";
 
 test.describe("Command Palette (AC #5)", () => {
   test.beforeEach(async ({ page }) => {
@@ -34,6 +35,9 @@ test.describe("Command Palette (AC #5)", () => {
     const input = page.getByPlaceholder(/search testcases/i);
     await expect(input).toBeVisible();
     await expect(input).toBeFocused();
+
+    // Axe scan with the palette open
+    await axeScan(page);
   });
 
   test("typing query shows results grouped by kind", async ({ page, applyTheme }) => {

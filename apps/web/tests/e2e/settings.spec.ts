@@ -9,6 +9,7 @@
  */
 
 import { test, expect, SEED_PROJECT_SLUG } from "./fixtures";
+import { axeScan } from "./axe.helper";
 
 test.describe("Settings — API Tokens (AC #9)", () => {
   test.beforeEach(async ({ page }) => {
@@ -98,6 +99,9 @@ test.describe("Profile page", () => {
     await expect(
       page.getByText(/e2e@wombat\.test|E2E User/i),
     ).toBeVisible({ timeout: 10_000 });
+
+    // Axe scan the profile page
+    await axeScan(page);
   });
 });
 
