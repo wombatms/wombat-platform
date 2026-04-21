@@ -1,72 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { useCallback, useEffect, useRef } from "react";
+import { Outlet, useNavigate, useParams } from "react-router-dom";
 import { RequireAuth } from "@/features/auth/guards";
 import { Header } from "./Header";
 import { LeftNav } from "./LeftNav";
-
-/**
- * Accessible overlay for the command palette placeholder.
- * Uses a real button for the backdrop dismiss so a11y rules are satisfied.
- * Phase 4 Task 43 replaces this stub with the full cmdk CommandPalette.
- */
-function PaletteOverlay({ onClose }: { onClose: () => void }) {
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  // Close on Escape
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", handler);
-    panelRef.current?.focus();
-    return () => document.removeEventListener("keydown", handler);
-  }, [onClose]);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh]"
-      style={{ background: "rgba(0,0,0,0.35)" }}
-      aria-hidden="false"
-    >
-      {/* Backdrop dismiss */}
-      <button
-        type="button"
-        aria-label="Close command palette"
-        className="absolute inset-0 w-full h-full cursor-default"
-        onClick={onClose}
-        tabIndex={-1}
-      />
-      {/* Panel */}
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-label="Command palette"
-        aria-modal="true"
-        tabIndex={-1}
-        className="relative w-full max-w-lg rounded-lg p-4 text-sm outline-none"
-        style={{
-          background: "var(--bg-surface-1)",
-          border: "1px solid var(--border-default)",
-          boxShadow: "var(--shadow-lg)",
-        }}
-      >
-        <p style={{ color: "var(--fg-muted)" }}>
-          Command palette — wired in Task 43. Press{" "}
-          <kbd
-            className="rounded px-1 py-0.5 text-[11px] font-mono"
-            style={{
-              background: "var(--bg-surface-2)",
-              border: "1px solid var(--border-default)",
-            }}
-          >
-            Esc
-          </kbd>{" "}
-          to close.
-        </p>
-      </div>
-    </div>
-  );
-}
+import { useCommandPalette } from "@/features/search/CommandPaletteProvider";
+import { GlobalShortcutsOverlay } from "@/lib/shortcuts/ShortcutsOverlay";
+import { useTheme } from "@/lib/theme/useTheme";
 
 /**
  * AppShell — authenticated three-region grid.
@@ -79,30 +18,81 @@ function PaletteOverlay({ onClose }: { onClose: () => void }) {
  *   │ (220px)  │                       │
  *   └──────────┴───────────────────────┘
  *
- * - Unauthenticated users are redirected to /login by RequireAuth.
- * - ⌘K opens the command palette (placeholder until Task 43).
- * - Reduced-motion respected; no decorative animation.
+ * Global shortcuts:
+ *   t        — toggle theme (light/dark)
+ *   g p      — go to projects
+ *   g l      — go to library (current project)
+ *   ?        — shortcuts overlay (via GlobalShortcutsOverlay)
+ *   ⌘K       — command palette (via CommandPaletteProvider)
  */
 export function AppShell() {
-  const [paletteOpen, setPaletteOpen] = useState(false);
+  const { open: openPalette } = useCommandPalette();
+  const { mode, setMode, applied } = useTheme();
+  const navigate = useNavigate();
+  const { projectSlug } = useParams<{ projectSlug?: string }>();
 
-  const openPalette = useCallback(() => setPaletteOpen(true), []);
+  // Sequence shortcut state: track pending "g" for g+p / g+l
+  const pendingG = useRef(false);
+  const pendingGTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Global ⌘K / Ctrl+K listener
+  const handleThemeToggle = useCallback(() => {
+    const next = applied === "light" ? "dark" : "light";
+    setMode(next);
+  }, [applied, setMode]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        setPaletteOpen((v) => !v);
+      const tgt = e.target as HTMLElement;
+      const isEditing =
+        tgt.tagName === "INPUT" ||
+        tgt.tagName === "TEXTAREA" ||
+        tgt.isContentEditable;
+      if (isEditing) return;
+
+      // t — toggle theme
+      if (e.key === "t" && !e.metaKey && !e.ctrlKey) {
+        handleThemeToggle();
+        return;
+      }
+
+      // g p / g l sequence
+      if (e.key === "g" && !e.metaKey && !e.ctrlKey) {
+        pendingG.current = true;
+        if (pendingGTimer.current) clearTimeout(pendingGTimer.current);
+        pendingGTimer.current = setTimeout(() => {
+          pendingG.current = false;
+        }, 1000);
+        return;
+      }
+      if (pendingG.current) {
+        pendingG.current = false;
+        if (pendingGTimer.current) clearTimeout(pendingGTimer.current);
+        if (e.key === "p") {
+          e.preventDefault();
+          navigate("/projects");
+          return;
+        }
+        if (e.key === "l") {
+          e.preventDefault();
+          if (projectSlug) navigate(`/p/${projectSlug}/library`);
+          else navigate("/projects");
+          return;
+        }
       }
     };
+
     document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, []);
+    return () => {
+      document.removeEventListener("keydown", handler);
+      if (pendingGTimer.current) clearTimeout(pendingGTimer.current);
+    };
+  }, [handleThemeToggle, navigate, projectSlug]);
+
+  // Suppress the unused variable warning — mode is read by ThemePage
+  void mode;
 
   return (
     <RequireAuth>
-      {/* Outer wrapper fills viewport */}
       <div
         className="flex flex-col min-h-screen"
         style={{ background: "var(--bg-app)", color: "var(--fg-default)" }}
@@ -134,10 +124,8 @@ export function AppShell() {
           </main>
         </div>
 
-        {/* Command palette placeholder — Task 43 wires cmdk here */}
-        {paletteOpen && (
-          <PaletteOverlay onClose={() => setPaletteOpen(false)} />
-        )}
+        {/* Shortcuts help overlay — triggered by ? key */}
+        <GlobalShortcutsOverlay />
       </div>
     </RequireAuth>
   );
