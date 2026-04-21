@@ -38,6 +38,27 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["/"], description: "Focus search" },
     ],
   },
+  {
+    category: "Content detail",
+    entries: [
+      { keys: ["e"], description: "Edit (when content:propose)" },
+    ],
+  },
+  {
+    category: "Approvals inbox",
+    entries: [
+      { keys: ["o"], description: "Open selected proposal" },
+      { keys: ["a"], description: "Approve selected (admin only)" },
+      { keys: ["r"], description: "Reject selected (admin only)" },
+      { keys: ["w"], description: "Withdraw selected (author only)" },
+    ],
+  },
+  {
+    category: "Edit form",
+    entries: [
+      { keys: ["p"], description: "Publish directly (when content:publish_direct)" },
+    ],
+  },
 ];
 
 function Kbd({ children }: { children: ReactNode }) {
