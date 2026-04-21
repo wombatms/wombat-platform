@@ -162,6 +162,8 @@ async def create_api_token(
         scopes=body.scopes,
         token_hash=token_hash,
         expires_at=expires_at,
+        publish_direct=body.publish_direct,
+        purpose=body.purpose,
     )
     await session.commit()
 
@@ -170,6 +172,8 @@ async def create_api_token(
         name=token_row.name,
         scopes=token_row.scopes,
         expires_at=token_row.expires_at,
+        publish_direct=token_row.publish_direct,
+        purpose=token_row.purpose,
         created_at=token_row.created_at,
         raw_token=raw_token,
     )

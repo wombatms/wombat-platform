@@ -202,6 +202,8 @@ class Repository:
         scopes: list[str],
         token_hash: str,
         expires_at: datetime | None,
+        publish_direct: bool = False,
+        purpose: str | None = None,
     ) -> APITokenDB:
         row = APITokenDB(
             user_id=user_id,
@@ -209,6 +211,8 @@ class Repository:
             scopes=scopes,
             token_hash=token_hash,
             expires_at=expires_at,
+            publish_direct=publish_direct,
+            purpose=purpose,
         )
         self.session.add(row)
         await self.session.flush()

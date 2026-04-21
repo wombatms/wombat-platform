@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class RegisterRequest(BaseModel):
@@ -33,6 +33,15 @@ class CreateAPITokenRequest(BaseModel):
     name: str
     scopes: list[str] = []
     expires_in_days: int | None = None
+    publish_direct: bool = False
+    purpose: str | None = None
+
+    @field_validator("purpose")
+    @classmethod
+    def purpose_required_when_grant(cls, v: str | None, info) -> str | None:
+        if info.data.get("publish_direct") and not (v and v.strip()):
+            raise ValueError("purpose is required when publish_direct=true")
+        return v
 
 
 class APITokenResponse(BaseModel):
@@ -40,6 +49,8 @@ class APITokenResponse(BaseModel):
     name: str
     scopes: list[str]
     expires_at: datetime | None
+    publish_direct: bool
+    purpose: str | None
     created_at: datetime
 
     model_config = {"from_attributes": True}
