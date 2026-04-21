@@ -1,10 +1,13 @@
 import { Providers } from "./providers";
 import { Router } from "./router";
+import { RootErrorBoundary } from "@/features/errors/GenericErrorPage";
 
 export function App() {
   return (
-    <Providers>
-      <Router />
-    </Providers>
+    <RootErrorBoundary>
+      <Providers>
+        <Router />
+      </Providers>
+    </RootErrorBoundary>
   );
 }
