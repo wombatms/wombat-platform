@@ -14,3 +14,6 @@ apps/*/.vite/
 apps/*/coverage/
 apps/*/playwright-report/
 apps/*/test-results/
+apps/*/*.tsbuildinfo
+apps/*/vite.config.d.ts
+apps/*/vite.config.js
