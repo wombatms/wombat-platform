@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import update as sa_update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from wombat_api.database.models import (
@@ -20,6 +23,8 @@ from wombat_api.database.models import (
     ContentChunk,
     ExecutionResultDB,
     ProjectDB,
+    ProposalDB,
+    ProposalEventDB,
     RunDB,
     SyncLogDB,
     UserDB,
@@ -40,6 +45,57 @@ def canonical_json(body: dict) -> str:
 
 def content_hash_for(body: dict) -> str:
     return hashlib.sha256(canonical_json(body).encode("utf-8")).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# Proposal errors + filters (SP3.2)
+# ---------------------------------------------------------------------------
+
+
+class OpenProposalExistsError(Exception):
+    """An OPEN proposal already exists for this content row."""
+
+    def __init__(self, existing_proposal_id: uuid.UUID):
+        self.existing_proposal_id = existing_proposal_id
+        super().__init__(f"open proposal already exists: {existing_proposal_id}")
+
+
+class ProposalNotFoundError(Exception):
+    """The requested proposal does not exist."""
+
+
+class ProposalNotOpenError(Exception):
+    """Attempted to update a proposal whose status is not 'open'."""
+
+    def __init__(self, status: str):
+        self.status = status
+        super().__init__(f"proposal not open (status={status})")
+
+
+class StaleBaseRevisionError(Exception):
+    """The caller's base_revision does not match the stored one (optimistic lock)."""
+
+    def __init__(self, current: str):
+        self.current = current
+        super().__init__(f"stale base_revision; current={current}")
+
+
+def _encode_cursor(dt: datetime) -> str:
+    return base64.urlsafe_b64encode(dt.isoformat().encode()).decode()
+
+
+def _decode_cursor(cursor: str) -> datetime:
+    return datetime.fromisoformat(base64.urlsafe_b64decode(cursor.encode()).decode())
+
+
+@dataclass
+class ProposalFilters:
+    status: str | None = "open"
+    kind: str | None = None
+    author_user_id: uuid.UUID | None = None
+    author_kind: str | None = None
+    cursor: str | None = None
+    limit: int = 50
 
 
 class Repository:
@@ -487,3 +543,203 @@ class Repository:
             conds.append(AuditLogDB.action == filters["action"])
         q = select(AuditLogDB).where(and_(*conds)).order_by(AuditLogDB.created_at.desc()).limit(limit).offset(offset)
         return list((await self.session.execute(q)).scalars())
+
+    # --- Proposals (SP3.2) ----------------------------------------------------
+
+    async def create_proposal(
+        self,
+        *,
+        project_id: uuid.UUID,
+        content_id: uuid.UUID | None,
+        kind: str,
+        source_path: str,
+        base_revision: str,
+        proposed_title: str,
+        proposed_body: dict,
+        proposal_action: str,
+        summary: str | None,
+        author_user_id: uuid.UUID,
+        author_kind: str,
+    ) -> ProposalDB:
+        """Create a new proposal.
+
+        Raises OpenProposalExistsError if an open proposal already exists for
+        the same content_id.  Postgres enforces this via the partial unique
+        index `ux_proposal_open_per_content`; on dialects without partial
+        indexes (SQLite unit tests) we emulate the check with an explicit
+        SELECT before INSERT.
+        """
+        if content_id is not None:
+            existing = await self.session.execute(
+                select(ProposalDB).where(
+                    ProposalDB.content_id == content_id,
+                    ProposalDB.status == "open",
+                )
+            )
+            existing_row = existing.scalar_one_or_none()
+            if existing_row is not None:
+                raise OpenProposalExistsError(existing_proposal_id=existing_row.id)
+
+        proposal = ProposalDB(
+            project_id=project_id,
+            content_id=content_id,
+            kind=kind,
+            source_path=source_path,
+            base_revision=base_revision,
+            proposed_title=proposed_title,
+            proposed_body=proposed_body,
+            proposal_action=proposal_action,
+            summary=summary,
+            author_user_id=author_user_id,
+            author_kind=author_kind,
+            status="open",
+        )
+        self.session.add(proposal)
+        try:
+            await self.session.flush()
+        except IntegrityError as exc:
+            # Concurrent writer won the race on Postgres; surface the
+            # typed error so the router can return 409.
+            await self.session.rollback()
+            if content_id is not None:
+                existing = await self.session.execute(
+                    select(ProposalDB).where(
+                        ProposalDB.content_id == content_id,
+                        ProposalDB.status == "open",
+                    )
+                )
+                winner = existing.scalar_one_or_none()
+                if winner is not None:
+                    raise OpenProposalExistsError(existing_proposal_id=winner.id) from exc
+            raise
+        return proposal
+
+    async def get_proposal(self, proposal_id: uuid.UUID) -> ProposalDB | None:
+        return await self.session.get(ProposalDB, proposal_id)
+
+    async def get_proposal_with_events(
+        self, proposal_id: uuid.UUID
+    ) -> tuple[ProposalDB, list[ProposalEventDB]] | None:
+        proposal = await self.get_proposal(proposal_id)
+        if proposal is None:
+            return None
+        events_q = (
+            select(ProposalEventDB)
+            .where(ProposalEventDB.proposal_id == proposal_id)
+            .order_by(ProposalEventDB.created_at.asc())
+        )
+        events = list((await self.session.execute(events_q)).scalars())
+        return proposal, events
+
+    async def list_proposals(
+        self,
+        *,
+        project_id: uuid.UUID,
+        filters: ProposalFilters,
+    ) -> tuple[list[ProposalDB], str | None]:
+        stmt = select(ProposalDB).where(ProposalDB.project_id == project_id)
+        if filters.status is not None:
+            stmt = stmt.where(ProposalDB.status == filters.status)
+        if filters.kind is not None:
+            stmt = stmt.where(ProposalDB.kind == filters.kind)
+        if filters.author_user_id is not None:
+            stmt = stmt.where(ProposalDB.author_user_id == filters.author_user_id)
+        if filters.author_kind is not None:
+            stmt = stmt.where(ProposalDB.author_kind == filters.author_kind)
+        if filters.cursor:
+            cutoff = _decode_cursor(filters.cursor)
+            stmt = stmt.where(ProposalDB.created_at < cutoff)
+        stmt = stmt.order_by(ProposalDB.created_at.desc()).limit(filters.limit + 1)
+        rows = list((await self.session.execute(stmt)).scalars())
+        next_cursor: str | None = None
+        if len(rows) > filters.limit:
+            next_cursor = _encode_cursor(rows[filters.limit - 1].created_at)
+            rows = rows[: filters.limit]
+        return rows, next_cursor
+
+    async def update_proposal_body(
+        self,
+        proposal_id: uuid.UUID,
+        *,
+        proposed_title: str | None,
+        proposed_body: dict | None,
+        summary: str | None,
+        base_revision: str,
+    ) -> ProposalDB:
+        """Update an open proposal's body / title / summary.
+
+        Raises:
+            ProposalNotFoundError: proposal does not exist.
+            ProposalNotOpenError: proposal is not in 'open' status.
+            StaleBaseRevisionError: caller's base_revision does not match the
+                stored one (optimistic lock).
+        """
+        proposal = await self.get_proposal(proposal_id)
+        if proposal is None:
+            raise ProposalNotFoundError()
+        if proposal.status != "open":
+            raise ProposalNotOpenError(status=proposal.status)
+        if proposal.base_revision != base_revision:
+            raise StaleBaseRevisionError(current=proposal.base_revision)
+        if proposed_title is not None:
+            proposal.proposed_title = proposed_title
+        if proposed_body is not None:
+            proposal.proposed_body = proposed_body
+        if summary is not None:
+            proposal.summary = summary
+        await self.session.flush()
+        return proposal
+
+    async def transition_proposal_status(
+        self,
+        proposal_id: uuid.UUID,
+        *,
+        new_status: str,
+        published_sha: str | None = None,
+    ) -> ProposalDB:
+        proposal = await self.get_proposal(proposal_id)
+        if proposal is None:
+            raise ProposalNotFoundError()
+        proposal.status = new_status
+        if published_sha is not None:
+            proposal.published_sha = published_sha
+        await self.session.flush()
+        return proposal
+
+    async def append_proposal_event(
+        self,
+        *,
+        proposal_id: uuid.UUID,
+        user_id: uuid.UUID,
+        action: str,
+        comment: str | None = None,
+        detail: dict | None = None,
+    ) -> ProposalEventDB:
+        event = ProposalEventDB(
+            proposal_id=proposal_id,
+            user_id=user_id,
+            action=action,
+            comment=comment,
+            detail=detail,
+        )
+        self.session.add(event)
+        await self.session.flush()
+        return event
+
+    async def reset_project_proposals(self, project_id: uuid.UUID) -> None:
+        """Test helper: delete all proposals + events for a project.
+
+        Lets integration tests reuse a shared Postgres database without
+        leaking state between test modules.
+        """
+        await self.session.execute(
+            sa_delete(ProposalEventDB).where(
+                ProposalEventDB.proposal_id.in_(
+                    select(ProposalDB.id).where(ProposalDB.project_id == project_id)
+                )
+            )
+        )
+        await self.session.execute(
+            sa_delete(ProposalDB).where(ProposalDB.project_id == project_id)
+        )
+        await self.session.flush()
