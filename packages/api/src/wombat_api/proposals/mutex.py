@@ -12,10 +12,10 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-from collections import defaultdict
-from contextlib import asynccontextmanager
-from typing import AsyncIterator
 import uuid
+from collections import defaultdict
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession

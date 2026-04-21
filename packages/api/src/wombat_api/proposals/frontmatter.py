@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import copy
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def mutate_review_block(
@@ -20,7 +20,7 @@ def mutate_review_block(
     If frontmatter has no `review:` key, one is added. Existing reviewers are
     preserved; the approver is appended to `approved_by` if not already present.
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     mutated = copy.deepcopy(body)
     fm = mutated.setdefault("frontmatter", {})
     review = fm.setdefault("review", {})
