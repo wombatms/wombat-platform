@@ -69,6 +69,7 @@ def _register_routes(app: FastAPI) -> None:
         imports,
         plans,
         projects,
+        proposals,
         runs,
         search,
         shared_steps,
@@ -91,6 +92,7 @@ def _register_routes(app: FastAPI) -> None:
     app.include_router(sync.router, prefix="/api/projects", tags=["sync"])
     app.include_router(imports.router, prefix="/api/projects", tags=["imports"])
     app.include_router(audit.router, prefix="/api/projects", tags=["audit"])
+    app.include_router(proposals.router)  # prefix already set in router definition
 
 
 def _register_error_handlers(app: FastAPI) -> None:
