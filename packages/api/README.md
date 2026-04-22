@@ -77,6 +77,52 @@ export AWS_SECRET_ACCESS_KEY=minioadmin
 Presigned MinIO URLs honour `WOMBAT_EVIDENCE_ENDPOINT_URL` automatically via
 the boto3 client configuration.
 
+### Tuning `WOMBAT_EVIDENCE_MAX_FILE_MB`
+
+The per-file upload cap defaults to **25 MiB**. It is enforced at three layers:
+
+1. **Pre-sign**: `POST /api/projects/:slug/runs/:id/cases/:cid/result/evidence:attach`
+   rejects requests whose `size_bytes` exceeds the limit before returning a
+   signed URL (LocalFS) or presigned POST (S3).
+2. **Upload**: the signed URL is bound to the exact `size_bytes` claimed at
+   pre-sign time; a larger body fails at upload.
+3. **Confirm**: `POST /evidence/:id/confirm` verifies `content_length` against
+   the cap and the signed claim.
+
+Raise the limit by setting `WOMBAT_EVIDENCE_MAX_FILE_MB=100` (or higher) in
+the API environment. Large values require that your S3 bucket or LocalFS
+filesystem can accommodate the increased storage.
+
+## Runs permissions (SP3.3)
+
+Every run write operation is gated by a `runs:*` permission. Role defaults:
+
+| Role      | `runs:view` | `runs:create` | `runs:assign` | `runs:record` | `runs:close` |
+|-----------|:---:|:---:|:---:|:---:|:---:|
+| `viewer`  | Y  | -  | -  | -  | -  |
+| `editor`  | Y  | Y  | Y  | Y  | Y  |
+| `admin`   | Y  | Y  | Y  | Y  | Y  |
+
+Tokens inherit the scopes set at issuance. A token scoped only to `runs:record`
+can report results for runs it is assigned to (see the next section for the
+CI-account gate) but cannot create, close, or reassign runs.
+
+### CI-account gate
+
+When a token records a result on a run, the server evaluates the following
+sequence (see `packages/api/src/wombat_api/rbac/guards.py::assert_run_actor_authorized`):
+
+1. If the principal is a user (not a token) with `runs:record`, allow.
+2. If the principal is a token and the token's owning user is an **admin**
+   on the project, allow.
+3. If the principal is a token and the token `id` appears in
+   `run_assignees.token_id` for this run, allow.
+4. Otherwise return `403 run_actor_not_authorized`.
+
+This enforces the SP3.3 design invariant that CI-scoped tokens can only
+record into runs they were assigned to at creation time. Reassignment (via
+`PATCH /api/projects/:slug/runs/:id`) updates the allowlist in place.
+
 ## Publisher setup (SP3.2)
 
 The proposal publisher writes approved content changes directly to the project's Git repository. It requires a working clone of each project's repo on the host running the API server.

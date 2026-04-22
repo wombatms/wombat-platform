@@ -3,11 +3,14 @@
 Web frontend for the Wombat test-case-management platform. Vite + React 18 + TypeScript (strict) + Tailwind v4 + shadcn/ui, consuming SP2's FastAPI via a typed `openapi-fetch` client.
 
 SP3.2 added the first write path (proposal review + publish).
+SP3.3 added manual + automated execution runs (create, record, close, reopen, rerun).
 
 - **Design spec (SP3.1):** [`docs/superpowers/specs/2026-04-21-wombat-platform-sub-project-3-1-design.md`](../../../docs/superpowers/specs/2026-04-21-wombat-platform-sub-project-3-1-design.md)
 - **Plan (SP3.1):** [`docs/plans/2026-04-21-wombat-platform-sub-project-3-1.md`](../../../docs/plans/2026-04-21-wombat-platform-sub-project-3-1.md)
 - **Design spec (SP3.2):** [`docs/superpowers/specs/2026-04-21-wombat-platform-sub-project-3-2-design.md`](../../../docs/superpowers/specs/2026-04-21-wombat-platform-sub-project-3-2-design.md)
 - **Plan (SP3.2):** [`docs/plans/2026-04-21-wombat-platform-sub-project-3-2.md`](../../../docs/plans/2026-04-21-wombat-platform-sub-project-3-2.md)
+- **Design spec (SP3.3):** [`docs/superpowers/specs/2026-04-22-wombat-platform-sub-project-3-3-design.md`](../../../docs/superpowers/specs/2026-04-22-wombat-platform-sub-project-3-3-design.md)
+- **Plan (SP3.3):** [`docs/plans/2026-04-22-wombat-platform-sub-project-3-3.md`](../../../docs/plans/2026-04-22-wombat-platform-sub-project-3-3.md)
 
 ## Prerequisites
 
@@ -156,6 +159,69 @@ curl -sf http://localhost:8000/openapi.json > apps/web/openapi.snapshot.json
 ```
 
 Then re-run `pnpm --filter web typecheck && pnpm --filter web test` to confirm nothing regressed, and commit both files together. CI's `check-openapi-drift.sh` will fail if `schema.d.ts` and the live `/openapi.json` diverge.
+
+## SP3.3 routes
+
+| Route | Purpose |
+|---|---|
+| `/p/:slug/runs` | Runs list (status/environment/assignee facets, virtualized rows) |
+| `/p/:slug/runs/new` | Create Run (3-tab Case Selector: Filter / Library / Paste IDs; inline-create environment) |
+| `/p/:slug/runs/:id` | Run Detail (header, Cases + Evidence + Events tabs, reassign/close/reopen/rerun) |
+| `/p/:slug/runs/:id/execute` | Runner (Focus Mode + Spreadsheet Grid); **lazy-loaded** via `React.lazy` |
+| `/p/:slug/settings/environments` | Admin-only environments management (create/delete; the seeded `default` env cannot be deleted) |
+
+The Runner route (`/runs/:id/execute`) is split out of the main bundle via
+`React.lazy` so that project members who don't execute runs don't pay the
+~13 KB (gzipped) Runner cost on every page load. The route-split is gated
+by `apps/web/scripts/check-bundle-budget.sh` — see "Bundle + contract gates"
+above.
+
+### Runner keyboard shortcuts
+
+The Runner is keyboard-first. All shortcuts are registered by
+`useRunnerKeyboard` in `src/features/runs/runner/useRunnerKeyboard.ts` and
+are shown in the in-app Help sheet (`?`).
+
+| Key | Action |
+|---|---|
+| `p` | Record **Pass** on the current case |
+| `f` | Record **Fail** on the current case |
+| `b` | Record **Blocked** on the current case |
+| `s` | Record **Skipped** on the current case |
+| `n` | Focus **Notes** field |
+| `a` | Attach **Evidence** (opens file picker) |
+| `u` | Paste **Bug URL** (editable inline) |
+| `g` then `g` | Open **Goto Case** dropdown |
+| `v` | Toggle Focus ↔ **Spreadsheet** grid view |
+| `?` | Show **Help** sheet (this table) |
+| `←` / `→` | Previous / Next case (Focus Mode) |
+| `↑` / `↓` | Previous / Next row (Grid Mode) |
+
+Shortcuts are suppressed whenever a text input, textarea, or contenteditable
+is focused. The `isCapturing` prop on `useRunnerKeyboard` is flipped to `true`
+inside Notes / Bug URL fields to avoid `p/f/b/s` recording a result while
+typing.
+
+## Regenerating `schema.d.ts`
+
+The TypeScript bindings at `src/lib/api/schema.d.ts` are generated from the
+backend's OpenAPI document. Two sources of truth are kept in sync:
+
+1. `apps/web/openapi.snapshot.json` — committed snapshot; the hermetic source
+   for CI.
+2. `apps/web/src/lib/api/schema.d.ts` — generated from the snapshot.
+
+```bash
+# Against a running API on :8000 (typical flow when the backend has changed)
+pnpm --filter web openapi:gen
+curl -sf http://localhost:8000/openapi.json > apps/web/openapi.snapshot.json
+pnpm --filter web exec openapi-typescript apps/web/openapi.snapshot.json \
+  -o apps/web/src/lib/api/schema.d.ts
+```
+
+Then `pnpm --filter web typecheck` and commit both files together. CI's
+`check-openapi-drift.sh` will fail if `schema.d.ts` and the live
+`/openapi.json` diverge.
 
 ## UI changes — `frontend-design` skill required
 
