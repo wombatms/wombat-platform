@@ -251,6 +251,7 @@ class Repository:
         expires_at: datetime | None,
         publish_direct: bool = False,
         purpose: str | None = None,
+        permissions: list[str] | None = None,
     ) -> APITokenDB:
         row = APITokenDB(
             user_id=user_id,
@@ -260,6 +261,7 @@ class Repository:
             expires_at=expires_at,
             publish_direct=publish_direct,
             purpose=purpose,
+            permissions=permissions,
         )
         self.session.add(row)
         await self.session.flush()

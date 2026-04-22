@@ -97,6 +97,10 @@ class APITokenDB(Base):
     # SP3.2 additions
     publish_direct: Mapped[bool] = mapped_column(default=False)
     purpose: Mapped[str | None] = mapped_column(String, nullable=True)
+    # SP3.3 additions: explicit permission subset granted at token-issuance time.
+    # NULL means "use role defaults"; an empty list means "no extra permissions";
+    # a populated list is the exact set of runs:* (and other) permissions granted.
+    permissions: Mapped[list[str] | None] = mapped_column(JSON, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

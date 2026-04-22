@@ -8,7 +8,10 @@ scoped RBAC so non-members cannot read or modify a project.
 
 from __future__ import annotations
 
+import hashlib
+import secrets
 import uuid
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +22,16 @@ from wombat_api.database.models import ProjectDB, UserDB
 from wombat_api.database.repository import Repository
 from wombat_api.rbac.middleware import require_role
 from wombat_api.rbac.models import Role
+from wombat_api.rbac.permissions import Permission, role_permissions
+from wombat_api.schemas.auth import CreateAPITokenRequest, CreateAPITokenResponse
 from wombat_api.schemas.common import ProjectCreate
+
+# Permissions that require admin issuer — editors may NOT grant these
+# even if they somehow hold them transitively.
+_ADMIN_ONLY_GRANTS: frozenset[Permission] = frozenset({
+    Permission.CONTENT_PUBLISH_DIRECT,
+    Permission.RUNS_REOPEN,
+})
 
 router = APIRouter()
 
@@ -191,3 +203,129 @@ async def remove_member(
     repo = Repository(session)
     await repo.remove_user_role(member_user_id, project.id)
     await session.commit()
+
+
+# ---------------------------------------------------------------------------
+# Project-scoped API token issuance (SP3.3)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/{project_slug}/tokens", response_model=CreateAPITokenResponse, status_code=201)
+async def create_project_token(
+    project_slug: str,
+    body: CreateAPITokenRequest,
+    user: UserDB = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> CreateAPITokenResponse:
+    """Issue an API token scoped to the caller's permissions on this project.
+
+    Permission grant rules (SP3.3):
+    - The caller must be at least a viewer on the project.
+    - The ``permissions`` list may contain any subset of the caller's own
+      role-default permissions.
+    - ``content:publish_direct`` and ``runs:reopen`` require an admin issuer.
+    - A non-admin cannot grant a permission they don't hold via their role.
+    - If ``permissions`` is omitted, it defaults to the caller's role-default
+      ``runs:*`` subset (no extra admin-only permissions).
+    """
+    repo = Repository(session)
+    project = await repo.get_project(project_slug)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    role_str = await repo.get_user_role(user.id, project.id)
+    if role_str is None:
+        raise HTTPException(status_code=403, detail="No access")
+
+    try:
+        role = Role[role_str]
+    except KeyError:
+        raise HTTPException(status_code=403, detail="No access")
+
+    is_admin = role == Role.admin
+    caller_perms: frozenset[Permission] = role_permissions(role)
+
+    # Resolve requested permissions.
+    if body.permissions is None:
+        # Default: caller's role-default runs:* subset.
+        granted_perms: list[str] = [
+            str(p) for p in caller_perms
+            if p.value.startswith("runs:")
+        ]
+    else:
+        # Validate each requested permission.
+        requested: list[Permission] = []
+        for perm_str in body.permissions:
+            try:
+                perm = Permission(perm_str)
+            except ValueError:
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "code": "invalid_permission",
+                        "message": f"Unknown permission: {perm_str!r}",
+                    },
+                )
+            # Admin-only permissions require admin issuer.
+            if perm in _ADMIN_ONLY_GRANTS and not is_admin:
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "code": "admin_required_for_permission",
+                        "message": f"Only admins may grant {perm.value}",
+                    },
+                )
+            # Non-admin cannot grant a permission they don't hold.
+            if not is_admin and perm not in caller_perms:
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "code": "cannot_grant_unowned_permission",
+                        "message": (
+                            f"Issuer does not hold {perm.value} and cannot grant it"
+                        ),
+                    },
+                )
+            requested.append(perm)
+        granted_perms = [str(p) for p in requested]
+
+    # publish_direct flag: only admins may set it (same rule as SP3.2).
+    if body.publish_direct and not is_admin:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "admin_required_for_permission",
+                "message": "Only admins may grant content:publish_direct via publish_direct flag",
+            },
+        )
+
+    raw_token = "wombat_" + secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+    expires_at: datetime | None = None
+    if body.expires_in_days is not None:
+        expires_at = datetime.now(UTC) + timedelta(days=body.expires_in_days)
+
+    token_row = await repo.create_api_token(
+        user_id=user.id,
+        name=body.name,
+        scopes=body.scopes,
+        token_hash=token_hash,
+        expires_at=expires_at,
+        publish_direct=body.publish_direct,
+        purpose=body.purpose,
+        permissions=granted_perms,
+    )
+    await session.commit()
+
+    return CreateAPITokenResponse(
+        id=token_row.id,
+        name=token_row.name,
+        scopes=token_row.scopes,
+        expires_at=token_row.expires_at,
+        publish_direct=token_row.publish_direct,
+        purpose=token_row.purpose,
+        permissions=token_row.permissions,
+        created_at=token_row.created_at,
+        raw_token=raw_token,
+    )

@@ -35,6 +35,9 @@ class CreateAPITokenRequest(BaseModel):
     expires_in_days: int | None = None
     publish_direct: bool = False
     purpose: str | None = None
+    # SP3.3: explicit permissions subset to grant on this token.
+    # If None (the default), the token inherits the issuer's role-default permissions.
+    permissions: list[str] | None = None
 
     @field_validator("purpose")
     @classmethod
@@ -51,6 +54,8 @@ class APITokenResponse(BaseModel):
     expires_at: datetime | None
     publish_direct: bool
     purpose: str | None
+    # SP3.3: explicit permission subset stored on this token (None = role defaults).
+    permissions: list[str] | None
     created_at: datetime
 
     model_config = {"from_attributes": True}

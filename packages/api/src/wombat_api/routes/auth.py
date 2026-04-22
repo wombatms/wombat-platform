@@ -199,6 +199,7 @@ async def create_api_token(
         expires_at=expires_at,
         publish_direct=body.publish_direct,
         purpose=body.purpose,
+        permissions=body.permissions,
     )
     await session.commit()
 
@@ -209,6 +210,7 @@ async def create_api_token(
         expires_at=token_row.expires_at,
         publish_direct=token_row.publish_direct,
         purpose=token_row.purpose,
+        permissions=token_row.permissions,
         created_at=token_row.created_at,
         raw_token=raw_token,
     )
