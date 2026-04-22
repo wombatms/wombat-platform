@@ -28,6 +28,12 @@
   --status-fail-fg: #a11a1a; --status-fail-bg: #fdebe8;
   --status-block-fg:#8a6a1a; --status-block-bg:#fdf4de;
   --status-skip-fg: #4b5260; --status-skip-bg: #e8eaef;
+  /* result tokens (SP3.3 runner) */
+  --result-pass-fg: #0f7a4a;   --result-pass-bg: #d4f2e2;
+  --result-fail-fg: #a11a1a;   --result-fail-bg: #fdebe8;
+  --result-blocked-fg: #8a6a1a; --result-blocked-bg: #fdf4de;
+  --result-skipped-fg: #4b5260; --result-skipped-bg: #e8eaef;
+  --result-not_run-fg: #4b5260; --result-not_run-bg: #f0f1f4;
   /* priority */
   --priority-high-fg: #a11a1a; --priority-high-bg: #fdebe8;
   --priority-med-fg:  #8a6a1a; --priority-med-bg:  #fdf4de;

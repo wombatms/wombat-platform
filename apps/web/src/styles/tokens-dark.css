@@ -22,6 +22,12 @@
   --status-fail-fg: #f87171; --status-fail-bg: #3b1f21;
   --status-block-fg:#fbbf24; --status-block-bg:#3a2e14;
   --status-skip-fg: #9ca3af; --status-skip-bg: #252830;
+  /* result tokens (SP3.3 runner) */
+  --result-pass-fg: #4ade80;    --result-pass-bg: #19301f;
+  --result-fail-fg: #f87171;    --result-fail-bg: #3b1f21;
+  --result-blocked-fg: #fbbf24; --result-blocked-bg: #3a2e14;
+  --result-skipped-fg: #9ca3af; --result-skipped-bg: #252830;
+  --result-not_run-fg: #6b7280; --result-not_run-bg: #1e2128;
   --priority-high-fg: #f87171; --priority-high-bg: #3b1f21;
   --priority-med-fg:  #fbbf24; --priority-med-bg:  #3a2e14;
   --priority-low-fg:  #9ca3af; --priority-low-bg:  #252830;

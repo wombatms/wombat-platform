@@ -8,6 +8,7 @@ import {
   Search,
   Settings,
   GitPullRequest,
+  PlayCircle,
 } from "lucide-react";
 import { useInboxBadge } from "@/features/proposals/api";
 import { usePermission } from "@/features/auth/useSession";
@@ -35,6 +36,7 @@ function useNavItems(projectSlug: string | undefined): {
     { key: "library", label: "Test Library", icon: BookOpen, to: `${base}/library`, disabled: noProject },
     { key: "shared-steps", label: "Shared Steps", icon: Share2, to: `${base}/shared-steps`, disabled: noProject },
     { key: "stories", label: "Stories", icon: BookMarked, to: `${base}/stories`, disabled: noProject },
+    { key: "runs", label: "Runs", icon: PlayCircle, to: `${base}/runs`, disabled: noProject },
     { key: "search", label: "Search", icon: Search, to: `${base}/search`, disabled: noProject },
     ...(canPropose && !noProject
       ? [{

@@ -1,5 +1,33 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { AppShell } from "./layouts/AppShell";
+import { PublicLayout } from "./layouts/PublicLayout";
+import { LoginPage } from "@/features/auth/LoginPage";
+import { RegisterPage } from "@/features/auth/RegisterPage";
+import { ProjectPickerPage } from "@/features/projects/ProjectPickerPage";
+import { LibraryPage } from "@/features/library/LibraryPage";
+import { TestcaseDetailPage } from "@/features/library/TestcaseDetailPage";
+import { SharedStepListPage } from "@/features/shared-steps/SharedStepListPage";
+import { SharedStepDetailPage } from "@/features/shared-steps/SharedStepDetailPage";
+import { StoryListPage } from "@/features/stories/StoryListPage";
+import { StoryDetailPage } from "@/features/stories/StoryDetailPage";
+import { SearchPage } from "@/features/search/SearchPage";
+import { SettingsShell } from "@/features/settings/SettingsShell";
+import { ProfilePage } from "@/features/settings/ProfilePage";
+import { TokensPage } from "@/features/settings/TokensPage";
+import { ThemePage } from "@/features/settings/ThemePage";
+import { ForbiddenPage } from "@/features/errors/ForbiddenPage";
+import { NotFoundPage } from "@/features/errors/NotFoundPage";
+// SP3.3 — Runs pages (eager; only RunExecutePage is lazy)
+import { RunsPage } from "@/features/runs/pages/RunsPage";
+import { RunCreatePage } from "@/features/runs/pages/RunCreatePage";
+import { RunDetailPage } from "@/features/runs/pages/RunDetailPage";
+import { SettingsEnvironmentsPage } from "@/features/runs/pages/SettingsEnvironmentsPage";
+
+// SP3.3 — Runner is code-split; must not appear in the main bundle.
+const LazyRunExecutePage = lazy(
+  () => import("@/features/runs/pages/RunExecutePage"),
+);
 
 // Lazy-loaded proposal feature pages (CodeMirror adds significant chunk size)
 const ApprovalsInboxPage = lazy(() =>
@@ -42,24 +70,27 @@ function ProposalFallback() {
     </div>
   );
 }
-import { AppShell } from "./layouts/AppShell";
-import { PublicLayout } from "./layouts/PublicLayout";
-import { LoginPage } from "@/features/auth/LoginPage";
-import { RegisterPage } from "@/features/auth/RegisterPage";
-import { ProjectPickerPage } from "@/features/projects/ProjectPickerPage";
-import { LibraryPage } from "@/features/library/LibraryPage";
-import { TestcaseDetailPage } from "@/features/library/TestcaseDetailPage";
-import { SharedStepListPage } from "@/features/shared-steps/SharedStepListPage";
-import { SharedStepDetailPage } from "@/features/shared-steps/SharedStepDetailPage";
-import { StoryListPage } from "@/features/stories/StoryListPage";
-import { StoryDetailPage } from "@/features/stories/StoryDetailPage";
-import { SearchPage } from "@/features/search/SearchPage";
-import { SettingsShell } from "@/features/settings/SettingsShell";
-import { ProfilePage } from "@/features/settings/ProfilePage";
-import { TokensPage } from "@/features/settings/TokensPage";
-import { ThemePage } from "@/features/settings/ThemePage";
-import { ForbiddenPage } from "@/features/errors/ForbiddenPage";
-import { NotFoundPage } from "@/features/errors/NotFoundPage";
+
+/**
+ * RunnerSpinner — minimal full-screen loading state for the lazy-loaded Runner.
+ * No AppShell chrome here; the runner renders outside the normal layout.
+ */
+function RunnerSpinner() {
+  return (
+    <div
+      className="flex h-screen w-screen items-center justify-center"
+      aria-busy="true"
+      aria-label="Loading runner"
+      style={{ background: "var(--bg-app)" }}
+    >
+      <div
+        className="h-8 w-8 rounded-full border-2 border-t-transparent animate-spin"
+        style={{ borderColor: "var(--border-strong)", borderTopColor: "transparent" }}
+        role="presentation"
+      />
+    </div>
+  );
+}
 
 export function Router() {
   return (
@@ -68,6 +99,16 @@ export function Router() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
       </Route>
+
+      {/* SP3.3: Runner is full-screen — rendered OUTSIDE AppShell (no sidebar/header). */}
+      <Route
+        path="/p/:projectSlug/runs/:id/execute"
+        element={
+          <Suspense fallback={<RunnerSpinner />}>
+            <LazyRunExecutePage />
+          </Suspense>
+        }
+      />
 
       <Route element={<AppShell />}>
         <Route index element={<Navigate to="/projects" replace />} />
@@ -82,6 +123,11 @@ export function Router() {
           <Route path="stories" element={<StoryListPage />} />
           <Route path="stories/:wombatId" element={<StoryDetailPage />} />
           <Route path="search" element={<SearchPage />} />
+
+          {/* SP3.3 Runs — Execute is registered outside AppShell above */}
+          <Route path="runs" element={<RunsPage />} />
+          <Route path="runs/new" element={<RunCreatePage />} />
+          <Route path="runs/:id" element={<RunDetailPage />} />
 
           {/* SP3.2 Proposals */}
           <Route
@@ -131,6 +177,8 @@ export function Router() {
           <Route path="profile" element={<ProfilePage />} />
           <Route path="tokens" element={<TokensPage />} />
           <Route path="theme" element={<ThemePage />} />
+          {/* SP3.3 */}
+          <Route path="environments" element={<SettingsEnvironmentsPage />} />
         </Route>
       </Route>
 
