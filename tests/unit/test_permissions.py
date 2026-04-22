@@ -12,9 +12,29 @@ from wombat_api.rbac.permissions import Permission, role_permissions
 @pytest.mark.parametrize(
     "role, expected",
     [
-        (Role.viewer, set()),
-        (Role.editor, {Permission.CONTENT_PROPOSE}),
-        (Role.admin, {Permission.CONTENT_PROPOSE, Permission.CONTENT_PUBLISH_DIRECT}),
+        (Role.viewer, {Permission.RUNS_READ}),
+        (
+            Role.editor,
+            {
+                Permission.CONTENT_PROPOSE,
+                Permission.RUNS_READ,
+                Permission.RUNS_CREATE,
+                Permission.RUNS_RECORD,
+                Permission.RUNS_CLOSE,
+            },
+        ),
+        (
+            Role.admin,
+            {
+                Permission.CONTENT_PROPOSE,
+                Permission.CONTENT_PUBLISH_DIRECT,
+                Permission.RUNS_READ,
+                Permission.RUNS_CREATE,
+                Permission.RUNS_RECORD,
+                Permission.RUNS_CLOSE,
+                Permission.RUNS_REOPEN,
+            },
+        ),
     ],
 )
 def test_role_permissions(role, expected):
