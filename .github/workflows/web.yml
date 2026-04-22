@@ -154,7 +154,7 @@ jobs:
         env:
           VITE_API_BASE_URL: ""
 
-      - name: Bundle budget check (warn > 250 KB | hard gate 350 KB gzipped total JS)
+      - name: Bundle budget check (main bundle warn > 250 KB | hard gate 350 KB gzip; route-split chunks excluded)
         run: |
           bash apps/web/scripts/check-bundle-budget.sh
         working-directory: .
