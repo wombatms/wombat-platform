@@ -9,6 +9,7 @@ from wombat_cli.commands.init import init_command
 from wombat_cli.commands.lint import lint_command
 from wombat_cli.commands.list import list_command
 from wombat_cli.commands.rag import rag_app
+from wombat_cli.commands.run import app as run_app
 from wombat_cli.commands.search import search_command
 from wombat_cli.commands.show import show_command
 from wombat_cli.commands.sync import sync_command
@@ -23,6 +24,7 @@ __all__ = [
     "init_command",
     "lint_command",
     "list_command",
+    "run_app",
     "search_command",
     "show_command",
     "update_command",

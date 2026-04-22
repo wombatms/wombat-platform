@@ -14,6 +14,7 @@ from wombat_cli.commands import (
     lint_command,
     list_command,
     rag_app,
+    run_app,
     search_command,
     show_command,
     sync_command,
@@ -71,6 +72,7 @@ app.command("config", help="Read or write .wombat/config.yaml settings.")(config
 app.command("sync", help="Sync Git-canonical content into the Wombat DB and RAG index.")(sync_command)
 app.command("import", help="Import test cases from XLSX or CSV file.")(import_command)
 app.add_typer(rag_app, name="rag")
+app.add_typer(run_app, name="run")
 
 
 if __name__ == "__main__":
