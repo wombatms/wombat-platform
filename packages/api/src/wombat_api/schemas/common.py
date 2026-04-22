@@ -22,38 +22,6 @@ class UserCreate(BaseModel):
     display_name: str
 
 
-class RunCreate(BaseModel):
-    title: str
-    plan_wombat_id: str | None = None
-    environment: str | None = None
-    assignees: list[str] = []
-    source: str = "api"
-
-
-class ExecutionResultCreate(BaseModel):
-    testcase_id: str  # wombat_id
-    match_by: str = "wombat_id"
-    status: str  # pass | fail | block | skip | error
-    duration_ms: int | None = None
-    environment: str | None = None
-    automated: bool = False
-    notes: str | None = None
-    bug_references: list[str] = []
-    evidence_references: list[str] = []
-    raw_payload: dict | None = None
-
-
-class RunSummary(BaseModel):
-    run_id: uuid.UUID
-    total: int
-    passed: int
-    failed: int
-    blocked: int
-    skipped: int
-    errored: int
-    duration_ms: int | None = None
-
-
 class SyncSummary(BaseModel):
     source_repo: str
     revision: str

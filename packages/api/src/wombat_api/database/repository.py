@@ -21,20 +21,15 @@ from wombat_api.database.models import (
     AuditLogDB,
     Content,
     ContentChunk,
-    ExecutionResultDB,
     ProjectDB,
     ProposalDB,
     ProposalEventDB,
-    RunDB,
     SyncLogDB,
     UserDB,
     UserProjectRoleDB,
 )
 from wombat_api.schemas.common import (
-    ExecutionResultCreate,
     ProjectCreate,
-    RunCreate,
-    RunSummary,
     UserCreate,
 )
 
@@ -412,104 +407,6 @@ class Repository:
                 r.deleted_at = now
                 n += 1
         return n
-
-    # --- Runs / Results -------------------------------------------------------
-
-    async def create_run(
-        self,
-        project_id: uuid.UUID,
-        run: RunCreate,
-        triggered_by: str,
-    ) -> RunDB:
-        row = RunDB(
-            project_id=project_id,
-            title=run.title,
-            plan_wombat_id=run.plan_wombat_id,
-            environment=run.environment,
-            assignees=run.assignees,
-            source=run.source,
-            triggered_by=triggered_by,
-        )
-        self.session.add(row)
-        await self.session.flush()
-        return row
-
-    async def get_run(self, run_id: uuid.UUID) -> RunDB | None:
-        return await self.session.get(RunDB, run_id)
-
-    async def list_runs(
-        self,
-        project_id: uuid.UUID,
-        limit: int,
-        offset: int,
-    ) -> list[RunDB]:
-        q = (
-            select(RunDB)
-            .where(RunDB.project_id == project_id)
-            .order_by(RunDB.created_at.desc())
-            .limit(limit)
-            .offset(offset)
-        )
-        return list((await self.session.execute(q)).scalars())
-
-    async def update_run_status(self, run_id: uuid.UUID, status: str) -> None:
-        await self.session.execute(sa_update(RunDB).where(RunDB.id == run_id).values(status=status))
-
-    async def bulk_add_results(
-        self,
-        run_id: uuid.UUID,
-        results: list[ExecutionResultCreate],
-        resolve_content_id,  # callable(wombat_id) -> UUID
-    ) -> int:
-        now = datetime.now(UTC)
-        created = 0
-        for r in results:
-            cid = await resolve_content_id(r.testcase_id)
-            if cid is None:
-                continue
-            self.session.add(
-                ExecutionResultDB(
-                    run_id=run_id,
-                    content_id=cid,
-                    wombat_testcase_id=r.testcase_id,
-                    status=r.status,
-                    duration_ms=r.duration_ms,
-                    environment=r.environment,
-                    automated=r.automated,
-                    notes=r.notes,
-                    bug_references=r.bug_references,
-                    evidence_references=r.evidence_references,
-                    raw_payload=r.raw_payload,
-                    executed_at=now,
-                )
-            )
-            created += 1
-        return created
-
-    async def get_run_summary(self, run_id: uuid.UUID) -> RunSummary:
-        q = (
-            select(ExecutionResultDB.status, func.count(), func.sum(ExecutionResultDB.duration_ms))
-            .where(ExecutionResultDB.run_id == run_id)
-            .group_by(ExecutionResultDB.status)
-        )
-        rows = (await self.session.execute(q)).all()
-        bucket = {"pass": 0, "fail": 0, "block": 0, "skip": 0, "error": 0}
-        total_duration = 0
-        for status, count, dur in rows:
-            bucket[status] = count
-            if dur is not None:
-                total_duration += int(dur)
-        total = sum(bucket.values())
-        return RunSummary(
-            run_id=run_id,
-            total=total,
-            passed=bucket["pass"],
-            failed=bucket["fail"],
-            blocked=bucket["block"],
-            skipped=bucket["skip"],
-            errored=bucket["error"],
-            duration_ms=total_duration or None,
-        )
 
     # --- Sync log -------------------------------------------------------------
 

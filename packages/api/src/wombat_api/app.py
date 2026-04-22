@@ -70,7 +70,6 @@ def _register_routes(app: FastAPI) -> None:
         plans,
         projects,
         proposals,
-        runs,
         search,
         shared_steps,
         stories,
@@ -88,7 +87,6 @@ def _register_routes(app: FastAPI) -> None:
     app.include_router(plans.router, prefix="/api/projects", tags=["content"])
     app.include_router(stories.router, prefix="/api/projects", tags=["content"])
     app.include_router(suites.router, prefix="/api/projects", tags=["content"])
-    app.include_router(runs.router, prefix="/api/projects", tags=["runs"])
     app.include_router(sync.router, prefix="/api/projects", tags=["sync"])
     app.include_router(imports.router, prefix="/api/projects", tags=["imports"])
     app.include_router(audit.router, prefix="/api/projects", tags=["audit"])

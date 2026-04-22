@@ -8,9 +8,7 @@ from wombat_api.database.models import (
     AuditLogDB,
     Content,
     ContentChunk,
-    ExecutionResultDB,
     ProjectDB,
-    RunDB,
     SyncLogDB,
     UserDB,
     UserProjectRoleDB,
@@ -94,34 +92,6 @@ class TestModelsExist:
         assert ch.content_id == parent_id
         assert ch.__tablename__ == "content_chunks"
 
-    def test_run_db(self):
-        r = RunDB(
-            id=uuid.uuid4(),
-            project_id=uuid.uuid4(),
-            title="Test Run",
-            triggered_by="test@example.com",
-            source="api",
-            status="pending",
-            assignees=[],
-            created_at=datetime.now(UTC),
-        )
-        assert r.status == "pending"
-        assert r.__tablename__ == "runs"
-
-    def test_execution_result_db(self):
-        er = ExecutionResultDB(
-            id=uuid.uuid4(),
-            run_id=uuid.uuid4(),
-            content_id=uuid.uuid4(),
-            wombat_testcase_id="tc-auth-login-0001",
-            status="pass",
-            automated=True,
-            executed_at=datetime.now(UTC),
-            created_at=datetime.now(UTC),
-        )
-        assert er.status == "pass"
-        assert er.__tablename__ == "execution_results"
-
     def test_all_tablenames_unique(self):
         models = [
             ProjectDB,
@@ -130,8 +100,6 @@ class TestModelsExist:
             UserProjectRoleDB,
             Content,
             ContentChunk,
-            RunDB,
-            ExecutionResultDB,
             SyncLogDB,
             AuditLogDB,
         ]
