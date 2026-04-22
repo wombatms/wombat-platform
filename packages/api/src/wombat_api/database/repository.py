@@ -21,6 +21,7 @@ from wombat_api.database.models import (
     AuditLogDB,
     Content,
     ContentChunk,
+    EnvironmentDB,
     ProjectDB,
     ProposalDB,
     ProposalEventDB,
@@ -125,6 +126,28 @@ class Repository:
             .where(UserProjectRoleDB.user_id == user_id)
         )
         return [(slug, role) for slug, role in (await self.session.execute(q)).all()]
+
+    async def ensure_default_environment(
+        self, *, project_id: uuid.UUID, user_id: uuid.UUID
+    ) -> EnvironmentDB:
+        """Idempotent. Creates a 'default' environment if missing; returns the row."""
+        existing = await self.session.execute(
+            select(EnvironmentDB).where(
+                EnvironmentDB.project_id == project_id,
+                EnvironmentDB.name == "default",
+            )
+        )
+        row = existing.scalar_one_or_none()
+        if row is not None:
+            return row
+        row = EnvironmentDB(
+            project_id=project_id,
+            name="default",
+            created_by_user_id=user_id,
+        )
+        self.session.add(row)
+        await self.session.flush()
+        return row
 
     # --- Users / Auth / RBAC --------------------------------------------------
 

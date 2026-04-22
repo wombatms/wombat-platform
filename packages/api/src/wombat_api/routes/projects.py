@@ -66,6 +66,8 @@ async def create_project(
     project = await repo.create_project(body)
     # Auto-assign creator as admin.
     await repo.set_user_role(user.id, project.id, Role.admin.name)
+    # SP3.3: every project has a 'default' execution environment out of the box.
+    await repo.ensure_default_environment(project_id=project.id, user_id=user.id)
     await session.commit()
     return {"data": _project_out(project)}
 
