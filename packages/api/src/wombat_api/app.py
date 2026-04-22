@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,12 +15,36 @@ from wombat_api.config import get_config
 logger = logging.getLogger(__name__)
 
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Application lifespan: initialise shared state on startup, clean up on shutdown.
+
+    State set here:
+    - ``app.state.evidence_backend`` — pluggable blob storage (LocalFS or S3).
+      Route handlers obtain it via
+      :func:`wombat_api.evidence.deps.get_evidence_backend`.
+    """
+    cfg = get_config()
+
+    from wombat_api.evidence import make_evidence_backend
+
+    app.state.evidence_backend = make_evidence_backend(cfg.evidence)
+    logger.info("Evidence backend initialised: backend=%s", cfg.evidence.backend)
+
+    yield
+
+    # ---- shutdown ----
+    # Nothing to explicitly close for LocalFS/S3 (boto3 sessions are per-call).
+    logger.info("Wombat API shutting down.")
+
+
 def create_app() -> FastAPI:
     cfg = get_config()
     app = FastAPI(
         title="Wombat API",
         version="0.1.0",
         description="Agent-friendly test case management API",
+        lifespan=_lifespan,
     )
     app.add_middleware(
         CORSMiddleware,
@@ -66,6 +92,7 @@ def _register_routes(app: FastAPI) -> None:
         audit,
         auth,
         content,
+        environments,
         imports,
         plans,
         projects,
@@ -90,7 +117,22 @@ def _register_routes(app: FastAPI) -> None:
     app.include_router(sync.router, prefix="/api/projects", tags=["sync"])
     app.include_router(imports.router, prefix="/api/projects", tags=["imports"])
     app.include_router(audit.router, prefix="/api/projects", tags=["audit"])
+    app.include_router(environments.router, prefix="/api/projects", tags=["environments"])
     app.include_router(proposals.router)  # prefix already set in router definition
+
+    # SP3.3 execution-tier routes — registered when the modules are available.
+    # ``runs.py`` and ``evidence.py`` are delivered by Tasks 14/15/21/22; until
+    # then the import silently skips so earlier tasks can start the server.
+    try:
+        from wombat_api.routes import evidence as evidence_routes  # noqa: F401
+        from wombat_api.routes import runs as runs_routes  # noqa: F401
+
+        app.include_router(runs_routes.router, prefix="/api/projects", tags=["runs"])
+        app.include_router(evidence_routes.router, tags=["evidence"])
+    except ImportError:
+        logger.debug(
+            "SP3.3 runs/evidence routes not yet available — skipping registration."
+        )
 
 
 def _register_error_handlers(app: FastAPI) -> None:
@@ -170,7 +212,7 @@ def _make_app_lazy() -> FastAPI:
             # `import wombat_api.app` works at import time.  Starting the
             # server will still raise once the ASGI lifespan runs.
             logger.debug("Embedder not available at import time; deferring: %s", exc)
-            _stub = FastAPI(title="Wombat API (embedder pending)")
+            _stub = FastAPI(title="Wombat API (embedder pending)", lifespan=_lifespan)
             return _stub
         raise
 
