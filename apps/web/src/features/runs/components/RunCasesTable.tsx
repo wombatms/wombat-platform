@@ -23,7 +23,7 @@
  */
 
 import { useMemo, useCallback } from "react";
-import { useNavigate, useSearchParams, useParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   CheckCircle2,
   XCircle,

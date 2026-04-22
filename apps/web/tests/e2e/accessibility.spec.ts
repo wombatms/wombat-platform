@@ -71,7 +71,7 @@ async function apiPost(
   return res.status === 204 ? null : await res.json();
 }
 
-async function apiGet(endpoint: string, token: string): Promise<unknown> {
+async function _apiGet(endpoint: string, token: string): Promise<unknown> {
   const res = await fetch(`${API_BASE}${endpoint}`, {
     headers: { Authorization: `Bearer ${token}` },
   });

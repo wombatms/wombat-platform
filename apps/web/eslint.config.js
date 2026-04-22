@@ -35,6 +35,10 @@ export default [
       globals: {
         ...globals.browser,
         ...globals.es2022,
+        // React is globally available via the automatic JSX runtime; we reference
+        // React.X types (ReactNode, MouseEvent, etc.) without importing the
+        // symbol, which ESLint's no-undef would otherwise flag.
+        React: "readonly",
       },
     },
     plugins: {
@@ -88,6 +92,10 @@ export default [
       globals: {
         ...globals.browser,
         ...globals.node,
+        // DOM types referenced in test-only type annotations
+        KeyboardEventInit: "readonly",
+        MouseEventInit: "readonly",
+        EventInit: "readonly",
       },
     },
     rules: {

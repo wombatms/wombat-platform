@@ -23,6 +23,7 @@
 
 import { test, expect, SEED_PROJECT_SLUG, SEED_USER } from "../fixtures";
 import { axeScan } from "../axe.helper";
+import type { APIRequestContext } from "@playwright/test";
 
 const API_BASE = process.env["WOMBAT_API_URL"] ?? "http://localhost:8000";
 
@@ -43,7 +44,7 @@ interface RunCreated {
  * Falls back to a direct fetch with a re-login if page.request lacks auth.
  */
 async function createRunViaApi(
-  request: import("@playwright/test").APIRequestContext,
+  request: APIRequestContext,
   slug: string,
   caseIds: string[],
 ): Promise<string> {

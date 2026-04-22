@@ -286,7 +286,9 @@ export function EvidencePreviewModal({
   if (!open || !record) return null;
 
   return (
-    /* Backdrop */
+    /* Backdrop: dialog role + Escape key handled at document level (effect above). */
+    /* Backdrop click dismisses; this is mouse-only by design and matches native dialog. */
+    /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "rgba(10, 12, 18, 0.72)" }}
@@ -295,7 +297,8 @@ export function EvidencePreviewModal({
       role="dialog"
       aria-label={`Preview: ${record.filename}`}
     >
-      {/* Modal panel */}
+      {/* Modal panel: pure visual container; interactive elements are its children. */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
       <div
         ref={dialogRef}
         className={cn(

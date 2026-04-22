@@ -155,13 +155,17 @@ export function GotoDropdown({
               className="px-4 py-5 text-sm text-center"
               style={{ color: "var(--fg-muted)" }}
             >
-              No cases match "{query}"
+              No cases match &ldquo;{query}&rdquo;
             </p>
           ) : (
             filtered.map((c, idx) => {
               const isCurrent = c.wombat_id === currentCaseId;
               const isHighlighted = idx === highlightedIdx;
               return (
+                // Keyboard navigation (Arrow/Enter/Esc) is handled at the
+                // dropdown's input via onKeyDown; options are activated via
+                // Enter, so only the mouse path needs a click handler here.
+                // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/interactive-supports-focus
                 <div
                   key={c.wombat_id}
                   id={`goto-item-${c.wombat_id}`}

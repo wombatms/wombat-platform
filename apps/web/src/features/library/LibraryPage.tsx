@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import type { ColumnDef } from "@tanstack/react-table";
 import { BookOpen, PanelRight, PlayCircle, X } from "lucide-react";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { FacetBar } from "@/components/shared/FacetBar";
@@ -521,7 +522,7 @@ export function LibraryPage() {
  */
 interface SelectableEntityTableProps<T extends object> {
   data: T[];
-  columns: import("@tanstack/react-table").ColumnDef<T>[];
+  columns: ColumnDef<T>[];
   onRowClick: (row: T, e: React.MouseEvent) => void;
   selectedId?: string;
   checkedIds: Set<string>;
@@ -581,6 +582,11 @@ function SelectableEntityTable<T extends object>({
   // visually by applying a subtle background to checked-but-not-selected rows.
 
   return (
+    // This wrapper intercepts modifier-click events to add multi-select on
+    // top of the inner EntityTable's rows. The rows themselves are the
+    // interactive, keyboard-accessible elements; this div is a pure event
+    // proxy and has no independent semantic action.
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
     <div
       className="relative h-full"
       onClick={handleWrapperClick}

@@ -147,7 +147,7 @@ beforeEach(() => {
 // Helpers — wait for the FilterTab case list to finish loading
 // ---------------------------------------------------------------------------
 
-async function waitForCaseList() {
+async function _waitForCaseList() {
   return waitFor(
     () => expect(screen.getByText(TC1_ID)).toBeInTheDocument(),
     NET_TIMEOUT,
@@ -220,8 +220,8 @@ describe("FilterTab", () => {
     // The count is split: <span>2</span> cases match
     // Use a query that matches the containing element text
     await waitFor(() => {
-      const toolbar = screen.getByRole("list", { name: /matching testcases/i })
-        .closest("[class*='border-b']") ?? document.body;
+      // Ensure the list renders before asserting the toolbar text
+      screen.getByRole("list", { name: /matching testcases/i });
       // Count span is sibling of "cases match" text node
       expect(screen.getAllByText(/cases match/)).toHaveLength(1);
     }, NET_TIMEOUT);

@@ -137,7 +137,6 @@ export function useRecordWithConflictHandling(
         throw err;
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [recordMutation, projectSlug, runId, queryClient],
   );
 

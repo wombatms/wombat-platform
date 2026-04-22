@@ -10,7 +10,7 @@
  * but the field is read-only and hidden from the form (per SP3.3 spec §8.4).
  */
 
-import { useCallback, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   useNavigate,
   useParams,
@@ -265,6 +265,12 @@ interface TitleFieldProps {
 
 function TitleField({ value, onChange, disabled }: TitleFieldProps) {
   const id = useId();
+  const ref = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    // Focus on mount (this is the primary action of the page).
+    // Using a ref+effect instead of autoFocus per jsx-a11y/no-autofocus.
+    ref.current?.focus();
+  }, []);
   return (
     <div className="flex flex-col gap-1.5">
       <label
@@ -276,13 +282,13 @@ function TitleField({ value, onChange, disabled }: TitleFieldProps) {
       </label>
       <Input
         id={id}
+        ref={ref}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="e.g. Sprint 42 regression"
         disabled={disabled}
         required
         aria-required="true"
-        autoFocus
       />
       {value.trim().length === 0 && (
         <p className="text-[10px]" style={{ color: "var(--fg-muted)" }}>

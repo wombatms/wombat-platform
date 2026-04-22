@@ -6,7 +6,7 @@
  * and a "Select all matching" button. Selected state is lifted to CaseSelector.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { CheckSquare, Square, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FacetBar } from "@/components/shared/FacetBar";
@@ -47,7 +47,7 @@ export function FilterTab({
     { q, component, tag, limit: 200 },
   );
 
-  const rows: Testcase[] = data?.data ?? [];
+  const rows: Testcase[] = useMemo(() => data?.data ?? [], [data]);
   const total = data?.total ?? 0;
 
   const handleSelectAll = useCallback(() => {
@@ -137,7 +137,7 @@ export function FilterTab({
               : "No testcases in this project yet."}
           </div>
         ) : (
-          <ul role="list" aria-label="Matching testcases">
+          <ul aria-label="Matching testcases">
             {rows.map((tc) => (
               <CaseRow
                 key={tc.wombat_id}

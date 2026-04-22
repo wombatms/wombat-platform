@@ -164,6 +164,10 @@ export function AssigneeMultiselect({
   const displayLabel = (opt: AssigneeOption) => opt.label;
 
   return (
+    // Container div only forwards keydown events to the inner combobox button
+    // and listbox for keyboard navigation. The interactive elements (button,
+    // input, options) are all inside and are properly labeled.
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div ref={containerRef} className="relative" onKeyDown={handleKeyDown}>
       {/* Trigger / chip container */}
       <button
@@ -268,6 +272,10 @@ export function AssigneeMultiselect({
               filtered.map((opt) => {
                 const selected = isSelected(opt);
                 return (
+                  // Keyboard activation is handled by the listbox's onKeyDown
+                  // (Arrow / Enter / Space) bound on the container at line 167.
+                  // The click handler here is for mouse users only.
+                  // eslint-disable-next-line jsx-a11y/click-events-have-key-events
                   <li
                     key={`${opt.kind}-${opt.id}`}
                     role="option"

@@ -249,7 +249,7 @@ export const GridRow = memo(function GridRow({
       <div
         className="shrink-0 flex items-center gap-0.5 px-2"
         style={{ width: "108px" }}
-        role="group"
+        role="gridcell"
         aria-label={`Record result for ${case_.wombat_id}`}
         aria-colindex={5}
       >

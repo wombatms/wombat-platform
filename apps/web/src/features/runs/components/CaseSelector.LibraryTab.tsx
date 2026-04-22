@@ -119,7 +119,7 @@ export function LibraryTab({
         {isLoading ? (
           <LibraryTabSkeleton count={preSelectedIds.length} />
         ) : (
-          <ul role="list" aria-label="Pre-selected cases from library">
+          <ul aria-label="Pre-selected cases from library">
             {relevantRows.map((tc) => (
               <LibraryCaseRow
                 key={tc.wombat_id}
@@ -277,7 +277,7 @@ function LibraryTabEmpty({ projectSlug }: { projectSlug: string }) {
         </p>
         <p className="text-xs leading-relaxed" style={{ color: "var(--fg-muted)" }}>
           To pre-populate this tab, select cases in the Library and use the
-          "Add to new run" bulk action, or navigate here with{" "}
+          &ldquo;Add to new run&rdquo; bulk action, or navigate here with{" "}
           <code className="font-mono text-[10px]">?ids=TC-001,TC-002</code> in
           the URL.
         </p>

@@ -26,7 +26,7 @@ import type { UseRunnerKeyboardProps } from "./useRunnerKeyboard";
 // Helpers
 // ---------------------------------------------------------------------------
 
-function noop() {}
+function _noop() {}
 
 /** Build a full props object with all callbacks as vi.fn(). */
 function makeProps(
