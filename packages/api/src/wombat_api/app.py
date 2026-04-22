@@ -121,13 +121,15 @@ def _register_routes(app: FastAPI) -> None:
     app.include_router(proposals.router)  # prefix already set in router definition
 
     # SP3.3 execution-tier routes — registered when the modules are available.
-    # ``runs.py`` and ``evidence.py`` are delivered by Tasks 14/15/21/22; until
+    # ``runs.py`` and ``evidence.py`` are delivered by Tasks 18–22; until
     # then the import silently skips so earlier tasks can start the server.
     try:
         from wombat_api.routes import evidence as evidence_routes  # noqa: F401
         from wombat_api.routes import runs as runs_routes  # noqa: F401
 
-        app.include_router(runs_routes.router, prefix="/api/projects", tags=["runs"])
+        # Runs router paths already include /api/projects/{project_slug}/...
+        # so register without an additional prefix.
+        app.include_router(runs_routes.router, tags=["runs"])
         app.include_router(evidence_routes.router, tags=["evidence"])
     except ImportError:
         logger.debug(
@@ -141,6 +143,60 @@ def _register_error_handlers(app: FastAPI) -> None:
     Error shape: {"error": {"code": "...", "message": "...", "field": null, "hint": null}}
     See prior SP2 spec §10.
     """
+
+    # SP3.3 domain exception handlers ----------------------------------------
+    from wombat_api.runs.exceptions import (
+        CaseAlreadyInRunError,
+        CaseNotInRunError,
+        EnvironmentNotFoundError,
+        RunClosedError,
+        RunNotFoundError,
+        RunNotOpenError,
+    )
+
+    @app.exception_handler(RunClosedError)
+    async def _run_closed(request: Request, exc: RunClosedError) -> JSONResponse:
+        return JSONResponse(
+            status_code=403,
+            content={"error": {"code": "run_closed", "message": "This run is closed; reopen first."}},
+        )
+
+    @app.exception_handler(EnvironmentNotFoundError)
+    async def _env_nf(request: Request, exc: EnvironmentNotFoundError) -> JSONResponse:
+        return JSONResponse(
+            status_code=404,
+            content={"error": {"code": "environment_not_found", "message": "Unknown environment."}},
+        )
+
+    @app.exception_handler(RunNotFoundError)
+    async def _run_nf(request: Request, exc: RunNotFoundError) -> JSONResponse:
+        return JSONResponse(
+            status_code=404,
+            content={"error": {"code": "run_not_found", "message": "Unknown run."}},
+        )
+
+    @app.exception_handler(RunNotOpenError)
+    async def _run_not_open(request: Request, exc: RunNotOpenError) -> JSONResponse:
+        return JSONResponse(
+            status_code=409,
+            content={"error": {"code": "run_not_open", "message": "This run is not closed."}},
+        )
+
+    @app.exception_handler(CaseAlreadyInRunError)
+    async def _cair(request: Request, exc: CaseAlreadyInRunError) -> JSONResponse:
+        return JSONResponse(
+            status_code=409,
+            content={"error": {"code": "case_already_in_run"}},
+        )
+
+    @app.exception_handler(CaseNotInRunError)
+    async def _cnir(request: Request, exc: CaseNotInRunError) -> JSONResponse:
+        return JSONResponse(
+            status_code=404,
+            content={"error": {"code": "case_not_in_run"}},
+        )
+
+    # -------------------------------------------------------------------------
 
     @app.exception_handler(Exception)
     async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:

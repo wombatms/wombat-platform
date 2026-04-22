@@ -405,3 +405,78 @@ async def temp_git_project(tmp_path_factory, monkeypatch, db_session: AsyncSessi
 
     # Restore config cache state so subsequent tests start fresh.
     get_config.cache_clear()
+
+
+# ---------------------------------------------------------------------------
+# SP3.3: run_with_N_cases fixtures
+# ---------------------------------------------------------------------------
+
+
+from dataclasses import dataclass
+
+
+@dataclass
+class RunFixture:
+    """Holds a seeded run with its project slug and case wombat_ids."""
+    id: str
+    project_slug: str
+    case_ids: list[str]
+
+
+async def _seed_testcases_and_run(
+    db_session,
+    httpx_client,
+    users,
+    seeded_project,
+    n: int,
+) -> RunFixture:
+    """Seed N testcase rows and create a run containing them."""
+    from wombat_api.database.models import Content
+
+    project, slug = seeded_project
+    prefix = f"TC-CONF-{n}-{uuid.uuid4().hex[:4]}"
+    case_ids: list[str] = []
+
+    for i in range(n):
+        wid = f"{prefix}-{i}"
+        row = Content(
+            project_id=project.id,
+            kind="testcase",
+            wombat_id=wid,
+            title=f"Test {wid}",
+            tags=[],
+            body={
+                "frontmatter": {"kind": "testcase", "id": wid},
+                "markdown": f"## Steps\n\n1. Step for {wid}.",
+            },
+            source_repo="test-repo",
+            source_path=f"tests/{wid}.md",
+            source_revision="abc123",
+            content_hash=f"hash-{wid}",
+        )
+        db_session.add(row)
+        case_ids.append(wid)
+
+    await db_session.commit()
+
+    # Create the run as the editor so the editor is the owner and passes the
+    # CI-account gate for result recording in tests.
+    token = users["editor"]["token"]
+    r = await httpx_client.post(
+        f"/api/projects/{slug}/runs",
+        json={"title": f"Fixture run ({n} cases)", "case_selection": {"case_ids": case_ids}},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 201, r.text
+    run_id = r.json()["data"]["id"]
+    return RunFixture(id=run_id, project_slug=slug, case_ids=case_ids)
+
+
+@pytest_asyncio.fixture
+async def run_with_1_case(db_session, httpx_client, users, seeded_project) -> RunFixture:
+    return await _seed_testcases_and_run(db_session, httpx_client, users, seeded_project, 1)
+
+
+@pytest_asyncio.fixture
+async def run_with_3_cases(db_session, httpx_client, users, seeded_project) -> RunFixture:
+    return await _seed_testcases_and_run(db_session, httpx_client, users, seeded_project, 3)
