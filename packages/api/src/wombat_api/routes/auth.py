@@ -149,8 +149,8 @@ async def me(
     permissions_by_project: dict[str, list[str]] = {}
     for slug, role_str in slug_roles:
         try:
-            role = Role(role_str)
-        except ValueError:
+            role = Role[role_str]
+        except KeyError:
             continue
         perms: set[str] = {str(p) for p in role_permissions(role)}
         # Additive: if the acting token has publish_direct, grant it globally.
