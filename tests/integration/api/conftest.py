@@ -480,3 +480,9 @@ async def run_with_1_case(db_session, httpx_client, users, seeded_project) -> Ru
 @pytest_asyncio.fixture
 async def run_with_3_cases(db_session, httpx_client, users, seeded_project) -> RunFixture:
     return await _seed_testcases_and_run(db_session, httpx_client, users, seeded_project, 3)
+
+
+@pytest_asyncio.fixture
+async def run_with_300_cases(db_session, httpx_client, users, seeded_project) -> RunFixture:
+    """300-case run used by batch-ingestion tests."""
+    return await _seed_testcases_and_run(db_session, httpx_client, users, seeded_project, 300)
