@@ -39,16 +39,46 @@ const EVIDENCE_URL_STALE_MS = 4.5 * 60 * 1000; // 270_000 ms
 // Shared types
 // ---------------------------------------------------------------------------
 
+/** Actor reference on an evidence record. */
+export interface EvidenceActorRef {
+  /** "user" or "token" */
+  principal_type: string;
+  /** UUID string of the user or API token. */
+  id: string;
+}
+
+/**
+ * Evidence record as stored / returned by the API.
+ *
+ * Fields from the upload response (post-upload, in runner context):
+ *   id, filename, content_type (alias for mime_type), size_bytes,
+ *   caption, created_at, run_id, case_id, result_id.
+ *
+ * Fields added in Task 47 GET list endpoint:
+ *   mime_type (canonical), uploaded_by, uploaded_at.
+ *
+ * `content_type` is kept as an alias of `mime_type` so that both the
+ * legacy upload response shape and the new list shape work without a
+ * migration on call sites.  When `mime_type` is present it is preferred;
+ * `content_type` falls back.
+ */
 export interface EvidenceRecord {
   id: string;
-  run_id: string;
-  case_id: string;
-  result_id: string;
+  run_id?: string;
+  case_id?: string;
+  result_id?: string;
   filename: string;
-  content_type: string;
+  /** MIME type from the list endpoint (canonical field name from EvidenceOut). */
+  mime_type?: string;
+  /** MIME type from the upload response (legacy field name). */
+  content_type?: string;
   size_bytes: number;
-  caption: string | null;
-  created_at: string;
+  caption?: string | null;
+  created_at?: string;
+  /** Populated by the GET list endpoint. */
+  uploaded_by?: EvidenceActorRef | null;
+  /** ISO timestamp from the GET list endpoint. */
+  uploaded_at?: string;
 }
 
 export interface EvidenceUrlResponse {
@@ -65,6 +95,47 @@ export interface UploadEvidenceArgs {
 // ---------------------------------------------------------------------------
 // Query hooks
 // ---------------------------------------------------------------------------
+
+/**
+ * List all evidence records attached to a specific case result.
+ *
+ * Returns an empty array when no result has been recorded yet (the server
+ * returns `{ data: [] }` in that case rather than 404).
+ *
+ * staleTime 30 s — evidence lists are relatively stable; a 0 s staleTime
+ * would cause excessive refetches when the gallery mounts on each tab switch.
+ */
+export function useResultEvidence(
+  projectSlug: string,
+  runId: string,
+  caseId: string,
+) {
+  return useQuery({
+    queryKey: runKeys.evidence(projectSlug, runId, caseId),
+    queryFn: async (): Promise<EvidenceRecord[]> => {
+      // The schema.d.ts snapshot predates this GET endpoint so we bypass
+      // the type constraint with a cast — same pattern as useRunCases.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (api.GET as any)(
+        "/api/projects/{project_slug}/runs/{run_id}/results/{case_id}/evidence",
+        {
+          params: {
+            path: {
+              project_slug: projectSlug,
+              run_id: runId,
+              case_id: caseId,
+            },
+          },
+        },
+      );
+      if (error) throw error;
+      const response = data as { data: EvidenceRecord[] };
+      return response.data ?? [];
+    },
+    enabled: Boolean(projectSlug && runId && caseId),
+    staleTime: 30_000,
+  });
+}
 
 /**
  * Fetch a presigned download URL for an evidence record.

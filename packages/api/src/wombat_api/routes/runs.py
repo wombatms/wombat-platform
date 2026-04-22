@@ -864,6 +864,65 @@ async def delete_result(
 
 
 # ---------------------------------------------------------------------------
+# Task 47 — GET /projects/{slug}/runs/{id}/results/{case_id}/evidence (list)
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/api/projects/{project_slug}/runs/{run_id}/results/{case_id}/evidence",
+)
+async def list_result_evidence(
+    project_slug: str,
+    run_id: str,
+    case_id: str,
+    authctx=Depends(require_permission(Permission.RUNS_READ)),
+    session: AsyncSession = Depends(get_session),
+):
+    """List evidence records attached to a specific run result.
+
+    Returns all evidence attached to the result for the given case in the given
+    run, ordered by upload time ascending.  Each record carries id, filename,
+    mime_type, size_bytes, uploaded_by, and uploaded_at — callers use
+    GET /api/evidence/{id}/url to obtain a presigned download URL.
+    """
+    project, _principal, _role = authctx
+    repo = Repository(session)
+
+    run = await _get_run_or_404(repo, project_id=project.id, run_id_str=run_id)
+
+    run_case = await repo.get_run_case_by_wombat_id(run_id=run.id, wombat_id=case_id)
+    if run_case is None:
+        raise HTTPException(status_code=404, detail={"code": "case_not_in_run"})
+
+    result = await repo.get_result(run_id=run.id, run_case_id=run_case.id)
+    if result is None:
+        # No result recorded yet — return empty list (not an error).
+        return {"data": []}
+
+    evidence_rows = await repo.list_evidence(result_id=result.id)
+
+    data = []
+    for ev in evidence_rows:
+        actor_ref: "ActorRef | None" = None
+        if ev.uploaded_by_user_id is not None:
+            actor_ref = ActorRef(principal_type="user", id=ev.uploaded_by_user_id)
+        elif ev.uploaded_by_token_id is not None:
+            actor_ref = ActorRef(principal_type="token", id=ev.uploaded_by_token_id)
+        data.append(
+            EvidenceOut(
+                id=ev.id,
+                filename=ev.filename,
+                mime_type=ev.mime_type,
+                size_bytes=ev.size_bytes,
+                uploaded_by=actor_ref,
+                uploaded_at=ev.uploaded_at,
+            ).model_dump(mode="json")
+        )
+
+    return {"data": data}
+
+
+# ---------------------------------------------------------------------------
 # Task 21 — POST /projects/{slug}/runs/{id}/results/{case_id}/evidence (upload)
 # ---------------------------------------------------------------------------
 

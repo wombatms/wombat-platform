@@ -8,9 +8,9 @@
  *   Success  → RunDetailHeader + RunDetailTabs
  *
  * Tab content (Cases / Evidence / Events) is provided as slot props to
- * RunDetailTabs. Cases slot wired in Task 46; Events slot in Task 48.
+ * RunDetailTabs. Cases slot wired in Task 46; Evidence in Task 47; Events in Task 48.
  *
- * SP3.3 Tasks 45, 46.
+ * SP3.3 Tasks 45, 46, 47.
  */
 
 import { useParams } from "react-router-dom";
@@ -22,6 +22,7 @@ import { RunDetailHeader, RunDetailHeaderSkeleton } from "../components/RunDetai
 import { RunDetailTabs } from "../components/RunDetailTabs";
 import { EventsList } from "../components/EventsList";
 import { RunCasesTable } from "../components/RunCasesTable";
+import { EvidenceGallery } from "../components/EvidenceGallery";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -163,7 +164,9 @@ export function RunDetailPage() {
         casesContent={
           <RunCasesTable projectSlug={projectSlug} runId={id} />
         }
-        evidenceContent={null}
+        evidenceContent={
+          <EvidenceGallery projectSlug={projectSlug} runId={id} />
+        }
         eventsContent={
           <EventsList projectSlug={projectSlug} runId={id} />
         }
