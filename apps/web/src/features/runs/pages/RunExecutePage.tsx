@@ -211,7 +211,12 @@ export default function RunExecutePage() {
   // Record handler — wires into useRecordWithConflictHandling
   // ---------------------------------------------------------------------------
 
-  function handleRecord(status: ResultStatus, failedAtStep?: number) {
+  function handleRecord(
+    status: ResultStatus,
+    failedAtStep?: number,
+    notes?: string | null,
+    bugLinks?: Array<{ url: string; title?: string | null; note?: string | null }>,
+  ) {
     const currentCaseParam = searchParams.get("case");
     const currentCase = currentCaseParam
       ? casesWithSnapshot.find((c) => c.wombat_id === currentCaseParam)
@@ -222,9 +227,9 @@ export default function RunExecutePage() {
     void record({
       case_id: currentCase.wombat_id,
       status,
-      notes: null,
+      notes: notes ?? null,
       failed_at_step: failedAtStep ?? null,
-      bug_links: [],
+      bug_links: bugLinks ?? [],
       duration_ms: null,
     });
   }

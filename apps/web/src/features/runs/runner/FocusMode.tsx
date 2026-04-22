@@ -31,10 +31,14 @@ import { RunProgressBar } from "../components/RunProgressBar";
 import { CaseRenderer, type CaseSnapshot } from "./CaseRenderer";
 import { ResultActionBar } from "./ResultActionBar";
 import { GotoDropdown } from "./GotoDropdown";
+import { NotesField } from "./NotesField";
+import { AttachEvidence } from "./AttachEvidence";
+import { BugUrlField } from "./BugUrlField";
+import { ReconcileBanner } from "./ReconcileBanner";
 import { ShortcutsOverlay } from "@/lib/shortcuts/ShortcutsOverlay";
 import { useRunnerKeyboard } from "./useRunnerKeyboard";
 import type { RunSummary, RunCase } from "../hooks/runs";
-import type { ResultRow, ResultStatus } from "../hooks/results";
+import type { ResultRow, ResultStatus, BugLink } from "../hooks/results";
 import type { ReconcileState } from "../lib/record";
 import { cn } from "@/lib/utils";
 
@@ -56,7 +60,12 @@ interface FocusModeProps {
   /** Whether a recording mutation is in flight */
   isPending: boolean;
   reconcile: ReconcileState;
-  onRecord: (status: ResultStatus, failedAtStep?: number) => void;
+  onRecord: (
+    status: ResultStatus,
+    failedAtStep?: number,
+    notes?: string | null,
+    bugLinks?: BugLink[],
+  ) => void;
   onClearReconcile: () => void;
 }
 
@@ -341,10 +350,14 @@ export function FocusMode({
     ? (results.get(currentCase.wombat_id) ?? null)
     : null;
 
+  // Sub-form state — persisted until the next result is recorded, then cleared
+  const [notes, setNotes] = useState("");
+  const [bugLinks, setBugLinks] = useState<BugLink[]>([]);
+
   // Sub-panel state
   const [activePanel, setActivePanel] = useState<"notes" | "attach" | "bug" | null>(null);
-  const notesRef = useRef<HTMLTextAreaElement | null>(null);
-  const bugUrlRef = useRef<HTMLInputElement | null>(null);
+  const notesRef = useRef<HTMLTextAreaElement>(null);
+  const bugUrlRef = useRef<HTMLInputElement>(null);
 
   // Goto dropdown
   const [gotoOpen, setGotoOpen] = useState(false);
@@ -396,7 +409,10 @@ export function FocusMode({
 
   const handleRecord = useCallback(
     (status: ResultStatus, failedAtStep?: number) => {
-      onRecord(status, failedAtStep);
+      onRecord(status, failedAtStep, notes || null, bugLinks);
+      // Clear sub-form state after recording
+      setNotes("");
+      setBugLinks([]);
       // Auto-advance after a brief delay so the user sees the success state
       setTimeout(() => {
         if (currentIdx < cases.length - 1) {
@@ -407,7 +423,7 @@ export function FocusMode({
         }
       }, 350);
     },
-    [onRecord, currentIdx, cases, results],
+    [onRecord, currentIdx, cases, results, notes, bugLinks],
   );
 
   // ---------------------------------------------------------------------------
@@ -534,30 +550,46 @@ export function FocusMode({
           onSkip={() => handleRecord("skipped")}
           activePanel={activePanel}
           onTogglePanel={togglePanel}
+          notesSlot={
+            <NotesField
+              value={notes}
+              onChange={setNotes}
+              textareaRef={notesRef}
+              onFocusChange={setIsCapturing}
+            />
+          }
+          attachSlot={
+            currentCase ? (
+              <AttachEvidence
+                projectSlug={projectSlug}
+                runId={run.id}
+                caseId={currentCase.wombat_id}
+              />
+            ) : null
+          }
+          bugUrlSlot={
+            <BugUrlField
+              value={bugLinks}
+              onChange={setBugLinks}
+              inputRef={bugUrlRef}
+              onFocusChange={setIsCapturing}
+            />
+          }
           reconcileSlot={
             reconcile.kind === "conflict" ? (
-              <div
-                className="px-4 py-2 border-t text-[12px]"
-                style={{
-                  background: "var(--feedback-warn-bg)",
-                  borderColor: "var(--feedback-warn-fg)",
-                  color: "var(--feedback-warn-fg)",
+              <ReconcileBanner
+                reconcile={reconcile}
+                projectSlug={projectSlug}
+                runId={run.id}
+                onResolved={(_newStatus) => {
+                  onClearReconcile();
                 }}
-              >
-                Conflict: another writer has recorded this case. Use the Reconcile banner to resolve.
-                <button
-                  type="button"
-                  onClick={onClearReconcile}
-                  className="ml-2 underline"
-                >
-                  Dismiss
-                </button>
-              </div>
+                onDismiss={onClearReconcile}
+              />
             ) : null
           }
         />
       </div>
-
       {/* Goto dropdown */}
       <GotoDropdown
         open={gotoOpen}
