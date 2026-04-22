@@ -396,3 +396,104 @@ class RunCaseDB(Base):
     __table_args__ = (
         Index("ux_run_case_unique", "run_id", "snapshot_id", unique=True),
     )
+
+
+class ResultDB(Base):
+    __tablename__ = "results"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("runs.id", ondelete="CASCADE")
+    )
+    run_case_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("run_cases.id", ondelete="CASCADE")
+    )
+    status: Mapped[str] = mapped_column(String)
+    # pass | fail | blocked | skipped
+    failed_at_step: Mapped[int | None] = mapped_column(nullable=True)
+    notes: Mapped[str | None] = mapped_column(String, nullable=True)
+    bug_links: Mapped[list[dict]] = mapped_column(_PortableJSONB, default=list)
+    duration_ms: Mapped[int | None] = mapped_column(nullable=True)
+    recorded_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    recorded_by_token_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("api_tokens.id"), nullable=True
+    )
+    source: Mapped[str] = mapped_column(String)
+    revision: Mapped[int] = mapped_column(default=1)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "(recorded_by_user_id IS NOT NULL)::int "
+            "+ (recorded_by_token_id IS NOT NULL)::int = 1",
+            name="ck_result_exactly_one_recorder",
+        ),
+        Index("ux_result_unique_case", "run_id", "run_case_id", unique=True),
+        Index("ix_result_run_status", "run_id", "status"),
+    )
+
+
+class ResultEvidenceDB(Base):
+    __tablename__ = "result_evidence"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    result_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("results.id", ondelete="CASCADE")
+    )
+    # Opaque handle returned by the EvidenceBackend.
+    blob_id: Mapped[str] = mapped_column(String)
+    filename: Mapped[str] = mapped_column(String)
+    mime_type: Mapped[str] = mapped_column(String)
+    size_bytes: Mapped[int] = mapped_column()
+    uploaded_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    uploaded_by_token_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("api_tokens.id"), nullable=True
+    )
+    uploaded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "(uploaded_by_user_id IS NOT NULL)::int "
+            "+ (uploaded_by_token_id IS NOT NULL)::int = 1",
+            name="ck_evidence_exactly_one_uploader",
+        ),
+    )
+
+
+class RunEventDB(Base):
+    __tablename__ = "run_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("runs.id", ondelete="CASCADE")
+    )
+    event_type: Mapped[str] = mapped_column(String)
+    # run_created | case_added | case_removed | result_recorded |
+    # result_updated | evidence_attached | evidence_removed |
+    # run_closed | run_aborted | run_reopened |
+    # assignee_added | assignee_removed
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    actor_token_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("api_tokens.id"), nullable=True
+    )
+    payload: Mapped[dict] = mapped_column(_PortableJSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_run_event_run_created", "run_id", "created_at"),
+    )
