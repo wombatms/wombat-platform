@@ -8,12 +8,14 @@ from datetime import datetime
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     JSON,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
     Integer,
     String,
     UniqueConstraint,
+    column,
     func,
 )
 from sqlalchemy import (
@@ -316,4 +318,81 @@ class RunDB(Base):
 
     __table_args__ = (
         Index("ix_run_project_status_created", "project_id", "status", "created_at"),
+    )
+
+
+class RunAssigneeDB(Base):
+    __tablename__ = "run_assignees"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("runs.id", ondelete="CASCADE")
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    token_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("api_tokens.id"), nullable=True
+    )
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    added_by_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+
+    __table_args__ = (
+        # Exactly one of user_id/token_id is set.
+        CheckConstraint(
+            "(user_id IS NOT NULL)::int + (token_id IS NOT NULL)::int = 1",
+            name="ck_run_assignee_exactly_one_principal",
+        ),
+        # Unique per run on whichever principal type is populated.
+        # Portable expression uniqueness: concat user_id/token_id with a tag
+        # keeps human vs. token separate.
+        Index(
+            "ux_run_assignee_principal",
+            "run_id",
+            func.coalesce(
+                func.cast(column("user_id"), String),
+                func.concat("tok:", func.cast(column("token_id"), String)),
+            ),
+            unique=True,
+        ),
+    )
+
+
+class RunCaseSnapshotDB(Base):
+    __tablename__ = "run_case_snapshots"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    # Dedup key: same body → same snapshot row, referenced by many run_cases.
+    content_hash: Mapped[str] = mapped_column(String, unique=True)
+    content_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("content.id"))
+    # Fully-resolved body (shared-steps inlined) matching wombat_core body shape.
+    snapshot_body: Mapped[dict] = mapped_column(_PortableJSONB)
+    snapshot_title: Mapped[str] = mapped_column(String)
+    # Display id as it appeared at snapshot time.
+    snapshot_wombat_id: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class RunCaseDB(Base):
+    __tablename__ = "run_cases"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("runs.id", ondelete="CASCADE")
+    )
+    snapshot_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("run_case_snapshots.id")
+    )
+    display_order: Mapped[int] = mapped_column()
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    added_by_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+
+    __table_args__ = (
+        Index("ux_run_case_unique", "run_id", "snapshot_id", unique=True),
     )
