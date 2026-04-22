@@ -291,13 +291,23 @@ def test_build_tool_registry_local_mode():
 
 
 def test_build_tool_registry_api_mode():
-    """In api mode only api: tools are registered."""
+    """In api mode only api-backed tools are registered (no local: tools).
+
+    SP2 tools use the ``api:`` prefix; SP3.3 execution-tier tools use bare
+    names (``create_run``, ``list_runs``, etc.) per spec §7.1.
+    """
     from wombat_mcp.tools import build_tool_registry
 
     registry = build_tool_registry("api")
     names = {t.name for t in registry.tool_definitions()}
-    assert all(n.startswith("api:") for n in names)
+    # No local: tools in api-only mode.
     assert not any(n.startswith("local:") for n in names)
+    # All tools are either api:-prefixed (SP2) or bare-named execution tools (SP3.3).
+    sp33_names = {"create_run", "list_runs", "get_run", "record_result", "attach_evidence", "close_run"}
+    for name in names:
+        assert name.startswith("api:") or name in sp33_names, (
+            f"Unexpected tool name in api mode: {name!r}"
+        )
 
 
 def test_build_tool_registry_both_mode():

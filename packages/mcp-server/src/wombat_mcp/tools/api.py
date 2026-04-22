@@ -16,11 +16,19 @@ Tools registered:
   - ``api:shared_steps.list``    GET /api/projects/{slug}/shared-steps
   - ``api:shared_steps.get``     GET /api/projects/{slug}/shared-steps/{wombat_id}
 
-  Run management:
+  Run management (SP2):
   - ``api:runs.list``            GET /api/projects/{slug}/runs
   - ``api:runs.get``             GET /api/projects/{slug}/runs/{run_id}
   - ``api:runs.create``          POST /api/projects/{slug}/runs
   - ``api:runs.add_results``     POST /api/projects/{slug}/runs/{run_id}/results:bulk
+
+  Execution tier (SP3.3):
+  - ``create_run``               POST /api/projects/{slug}/runs
+  - ``list_runs``                GET  /api/projects/{slug}/runs
+  - ``get_run``                  GET  /api/projects/{slug}/runs/{run_id}
+  - ``record_result``            POST /api/projects/{slug}/runs/{run_id}/results (single or batch)
+  - ``attach_evidence``          POST /api/projects/{slug}/runs/{run_id}/results/{case_id}/evidence
+  - ``close_run``                POST /api/projects/{slug}/runs/{run_id}/close
 
   Operations:
   - ``api:sync``                 POST /api/projects/{slug}/sync
@@ -180,6 +188,205 @@ _TOOLS: list[types.Tool] = [
                 },
             },
             "required": ["project", "run_id", "results"],
+        },
+    ),
+    # --- SP3.3 execution tier (spec §7.1) ---
+    types.Tool(
+        name="create_run",
+        description=(
+            "Create a new test run for a project. "
+            "Provide exactly one of case_ids or filter in case_selection."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "project": {"type": "string", "description": "Project slug."},
+                "title": {"type": "string", "description": "Title of the run."},
+                "environment_id": {
+                    "type": "string",
+                    "description": "UUID of the environment (optional).",
+                },
+                "case_selection": {
+                    "type": "object",
+                    "description": (
+                        "Exactly one of 'case_ids' (list of wombat_ids) or "
+                        "'filter' (dict of filter params)."
+                    ),
+                    "properties": {
+                        "case_ids": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Explicit list of case wombat_ids.",
+                        },
+                        "filter": {
+                            "type": "object",
+                            "description": "Filter dict (same shape as Library filter).",
+                        },
+                    },
+                },
+                "source": {
+                    "type": "string",
+                    "default": "manual",
+                    "description": "Origin label for this run (e.g. 'manual', 'ci', 'agent').",
+                },
+                "assignee_user_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "UUIDs of users to assign.",
+                    "default": [],
+                },
+                "assignee_token_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "UUIDs of API tokens to assign.",
+                    "default": [],
+                },
+            },
+            "required": ["project", "title", "case_selection"],
+        },
+    ),
+    types.Tool(
+        name="list_runs",
+        description="List test runs for a project with optional filters.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "project": {"type": "string", "description": "Project slug."},
+                "status": {
+                    "type": "string",
+                    "enum": ["open", "completed", "aborted"],
+                    "description": "Filter by run status.",
+                },
+                "environment_id": {
+                    "type": "string",
+                    "description": "UUID of environment to filter by.",
+                },
+                "owner_id": {
+                    "type": "string",
+                    "description": "UUID of owner user to filter by.",
+                },
+                "q": {"type": "string", "description": "Keyword search query."},
+                "limit": {"type": "integer", "default": 50},
+                "cursor": {"type": "string", "description": "Pagination cursor."},
+            },
+            "required": ["project"],
+        },
+    ),
+    types.Tool(
+        name="get_run",
+        description="Get a test run with full detail including cases and result summary.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "project": {"type": "string", "description": "Project slug."},
+                "run_id": {"type": "string", "description": "UUID of the run."},
+            },
+            "required": ["project", "run_id"],
+        },
+    ),
+    types.Tool(
+        name="record_result",
+        description=(
+            "Record one or more execution results on a run. "
+            "Pass a single dict or a list of dicts. "
+            "Each item needs: case_id (wombat_id of the run case), status (pass|fail|blocked|skipped). "
+            "Optional: notes, failed_at_step, bug_links, duration_ms."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "project": {"type": "string", "description": "Project slug."},
+                "run_id": {"type": "string", "description": "UUID of the run."},
+                "items": {
+                    "description": (
+                        "A single result dict or a list of result dicts. "
+                        "Each dict: {case_id, status, notes?, failed_at_step?, "
+                        "bug_links?, duration_ms?}."
+                    ),
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "properties": {
+                                "case_id": {"type": "string"},
+                                "status": {"type": "string", "enum": ["pass", "fail", "blocked", "skipped"]},
+                                "notes": {"type": "string"},
+                                "failed_at_step": {"type": "integer"},
+                                "bug_links": {"type": "array", "items": {"type": "object"}},
+                                "duration_ms": {"type": "integer"},
+                            },
+                            "required": ["case_id", "status"],
+                        },
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "case_id": {"type": "string"},
+                                    "status": {"type": "string", "enum": ["pass", "fail", "blocked", "skipped"]},
+                                    "notes": {"type": "string"},
+                                    "failed_at_step": {"type": "integer"},
+                                    "bug_links": {"type": "array", "items": {"type": "object"}},
+                                    "duration_ms": {"type": "integer"},
+                                },
+                                "required": ["case_id", "status"],
+                            },
+                        },
+                    ],
+                },
+            },
+            "required": ["project", "run_id", "items"],
+        },
+    ),
+    types.Tool(
+        name="attach_evidence",
+        description=(
+            "Attach a file as evidence to a specific case result in a run. "
+            "Provide base64-encoded file content. "
+            "Maximum file size is 25 MB. "
+            "A result must already exist for the case (record_result first)."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "project": {"type": "string", "description": "Project slug."},
+                "run_id": {"type": "string", "description": "UUID of the run."},
+                "case_id": {"type": "string", "description": "WombatID of the case."},
+                "filename": {"type": "string", "description": "Original filename (e.g. 'screenshot.png')."},
+                "mime_type": {"type": "string", "description": "MIME type (e.g. 'image/png')."},
+                "base64_content": {
+                    "type": "string",
+                    "description": "Base64-encoded file content. Must be ≤25 MB decoded.",
+                },
+                "caption": {
+                    "type": "string",
+                    "description": "Optional descriptive caption for this evidence.",
+                },
+            },
+            "required": ["project", "run_id", "case_id", "filename", "mime_type", "base64_content"],
+        },
+    ),
+    types.Tool(
+        name="close_run",
+        description=(
+            "Close a test run, marking it as completed or aborted. "
+            "Closed runs are immutable — no further results or evidence can be added."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "project": {"type": "string", "description": "Project slug."},
+                "run_id": {"type": "string", "description": "UUID of the run."},
+                "reason": {
+                    "type": "string",
+                    "enum": ["completed", "aborted"],
+                    "description": "Closure reason.",
+                },
+                "note": {
+                    "type": "string",
+                    "description": "Optional closure note.",
+                },
+            },
+            "required": ["project", "run_id", "reason"],
         },
     ),
     # --- sync / import ---
@@ -471,6 +678,138 @@ async def _list_sources(args: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# SP3.3 execution tier handlers (spec §7.1)
+# ---------------------------------------------------------------------------
+
+_MAX_EVIDENCE_BYTES = 25 * 1_048_576  # 25 MB
+
+
+async def _sp33_create_run(args: dict) -> dict:
+    """POST /api/projects/{slug}/runs — create a test run."""
+    project = args["project"]
+    body: dict = {
+        "title": args["title"],
+        "case_selection": args["case_selection"],
+        "source": args.get("source", "manual"),
+        "assignee_user_ids": args.get("assignee_user_ids", []),
+        "assignee_token_ids": args.get("assignee_token_ids", []),
+    }
+    if args.get("environment_id") is not None:
+        body["environment_id"] = args["environment_id"]
+    async with _client() as c:
+        r = await c.post(f"/api/projects/{project}/runs", json=body)
+        r.raise_for_status()
+        return r.json()
+
+
+async def _sp33_list_runs(args: dict) -> dict:
+    """GET /api/projects/{slug}/runs — list runs with filters."""
+    project = args["project"]
+    params: dict = {"limit": args.get("limit", 50)}
+    for key in ("status", "environment_id", "owner_id", "q", "cursor"):
+        if args.get(key) is not None:
+            params[key] = args[key]
+    async with _client() as c:
+        r = await c.get(f"/api/projects/{project}/runs", params=params)
+        r.raise_for_status()
+        return r.json()
+
+
+async def _sp33_get_run(args: dict) -> dict:
+    """GET /api/projects/{slug}/runs/{run_id} — get run detail."""
+    project = args["project"]
+    run_id = args["run_id"]
+    async with _client() as c:
+        r = await c.get(f"/api/projects/{project}/runs/{run_id}")
+        r.raise_for_status()
+        return r.json()
+
+
+async def _sp33_record_result(args: dict) -> dict:
+    """POST /api/projects/{slug}/runs/{run_id}/results — single or batch.
+
+    ``items`` may be a single dict or a list of dicts.  A single dict is
+    promoted to a one-element list so the server always receives a list.
+    """
+    project = args["project"]
+    run_id = args["run_id"]
+    items = args["items"]
+    if isinstance(items, dict):
+        items = [items]
+    async with _client() as c:
+        r = await c.post(
+            f"/api/projects/{project}/runs/{run_id}/results",
+            json=items,
+        )
+        r.raise_for_status()
+        return r.json()
+
+
+async def _sp33_attach_evidence(args: dict) -> dict:
+    """POST .../results/{case_id}/evidence — multipart upload from base64.
+
+    Decodes ``base64_content`` and enforces the 25 MB cap before making the
+    HTTP call so the caller gets a readable error rather than a 413 from the
+    server.
+    """
+    import base64
+
+    project = args["project"]
+    run_id = args["run_id"]
+    case_id = args["case_id"]
+    filename = args["filename"]
+    mime_type = args["mime_type"]
+    b64 = args["base64_content"]
+    caption = args.get("caption")
+
+    # Decode and enforce size cap early (helpful error before any HTTP call).
+    try:
+        raw_bytes = base64.b64decode(b64, validate=True)
+    except Exception as exc:
+        raise ValueError(f"base64_content is not valid base64: {exc}") from exc
+
+    if len(raw_bytes) > _MAX_EVIDENCE_BYTES:
+        mb = len(raw_bytes) / 1_048_576
+        raise ValueError(
+            f"Evidence file is {mb:.1f} MB which exceeds the 25 MB limit. "
+            "Upload large files directly via the REST evidence endpoint."
+        )
+
+    import io
+
+    file_obj = io.BytesIO(raw_bytes)
+    files = {"file": (filename, file_obj, mime_type)}
+    data = {}
+    if caption is not None:
+        data["caption"] = caption
+
+    async with _client() as c:
+        r = await c.post(
+            f"/api/projects/{project}/runs/{run_id}/results/{case_id}/evidence",
+            files=files,
+            data=data,
+        )
+        r.raise_for_status()
+        return r.json()
+
+
+async def _sp33_close_run(args: dict) -> dict:
+    """POST /api/projects/{slug}/runs/{run_id}/close."""
+    project = args["project"]
+    run_id = args["run_id"]
+    body: dict = {"reason": args["reason"]}
+    if args.get("note") is not None:
+        body["note"] = args["note"]
+    async with _client() as c:
+        r = await c.post(
+            f"/api/projects/{project}/runs/{run_id}/close",
+            json=body,
+        )
+        r.raise_for_status()
+        return r.json()
+
+
+# ---------------------------------------------------------------------------
 # Dispatch table
 # ---------------------------------------------------------------------------
 
@@ -497,6 +836,13 @@ async def _dispatch(name: str, args: dict) -> object:
         "api:get_content": _get_content,
         "api:find_related_testcases": _find_related_testcases,
         "api:list_sources": _list_sources,
+        # SP3.3 execution tier
+        "create_run": _sp33_create_run,
+        "list_runs": _sp33_list_runs,
+        "get_run": _sp33_get_run,
+        "record_result": _sp33_record_result,
+        "attach_evidence": _sp33_attach_evidence,
+        "close_run": _sp33_close_run,
     }
     handler = dispatch.get(name)
     if handler is None:

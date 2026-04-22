@@ -33,13 +33,13 @@ INTEGRATION_REPO = Path(__file__).parent.parent.parent / "fixtures" / "integrati
 # ---------------------------------------------------------------------------
 
 
-def test_tool_registry_both_mode_has_25_tools():
-    """Both mode advertises exactly 25 tools."""
+def test_tool_registry_both_mode_has_31_tools():
+    """Both mode advertises exactly 31 tools (25 SP2 + 6 SP3.3 execution tier)."""
     from wombat_mcp.tools import build_tool_registry
 
     registry = build_tool_registry("both")
     tools = registry.tool_definitions()
-    assert len(tools) == 25, f"Expected 25 tools in 'both' mode, got {len(tools)}: {[t.name for t in tools]}"
+    assert len(tools) == 31, f"Expected 31 tools in 'both' mode, got {len(tools)}: {[t.name for t in tools]}"
 
 
 def test_tool_registry_local_mode_has_5_tools():
@@ -51,13 +51,13 @@ def test_tool_registry_local_mode_has_5_tools():
     assert len(tools) == 5, f"Expected 5 tools in 'local' mode, got {len(tools)}"
 
 
-def test_tool_registry_api_mode_has_20_tools():
-    """API mode advertises exactly 20 tools."""
+def test_tool_registry_api_mode_has_26_tools():
+    """API mode advertises exactly 26 tools (20 SP2 + 6 SP3.3 execution tier)."""
     from wombat_mcp.tools import build_tool_registry
 
     registry = build_tool_registry("api")
     tools = registry.tool_definitions()
-    assert len(tools) == 20, f"Expected 20 tools in 'api' mode, got {len(tools)}"
+    assert len(tools) == 26, f"Expected 26 tools in 'api' mode, got {len(tools)}"
 
 
 def test_both_mode_includes_all_local_and_api_tools():
