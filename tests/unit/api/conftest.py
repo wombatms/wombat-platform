@@ -102,6 +102,20 @@ async def sample_token(db_session, sample_user) -> APITokenDB:
 
 
 @pytest_asyncio.fixture
+async def another_user(db_session) -> UserDB:
+    """A second UserDB row separate from sample_user (for CI-account gate tests)."""
+    user = UserDB(
+        id=uuid.uuid4(),
+        email="other@example.com",
+        hashed_password="x",
+        display_name="Other",
+    )
+    db_session.add(user)
+    await db_session.flush()
+    return user
+
+
+@pytest_asyncio.fixture
 async def sample_run(db_session, sample_project, sample_user) -> RunDB:
     """Minimal Run owned by sample_user."""
     row = RunDB(
