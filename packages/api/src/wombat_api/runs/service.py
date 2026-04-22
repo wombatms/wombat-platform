@@ -455,15 +455,47 @@ class RunService:
                 if result_by_case_id.get(rc.id) in include_statuses
             ]
 
-        new_run = await self.create_run(
-            project_id=parent_run.project_id,
-            owner_id=owner_id,
-            title=f"Rerun: {parent_run.title}",
-            case_selection=CaseSelection(case_ids=selected_ids or [""]),
-            environment_id=environment_id or parent_run.environment_id,
-            source=source,
-            parent_run_id=parent_run.id,
-        )
+        # Use case_ids if we have any; otherwise use a "no results" filter
+        # (an empty case_ids list fails the CaseSelection validator, so we
+        # route through the filter path with a highly-restrictive q that
+        # returns no rows — keeping a consistent code path while still
+        # allowing empty reruns).
+        if selected_ids:
+            selection = CaseSelection(case_ids=selected_ids)
+        else:
+            # Produce an empty run: use filter with a sentinel that matches nothing.
+            # Alternatively, we bypass create_run entirely for the zero-case path.
+            selection = None  # handled below
+
+        repo = Repository(self.session)
+
+        if selection is not None:
+            new_run = await self.create_run(
+                project_id=parent_run.project_id,
+                owner_id=owner_id,
+                title=f"Rerun: {parent_run.title}",
+                case_selection=selection,
+                environment_id=environment_id or parent_run.environment_id,
+                source=source,
+                parent_run_id=parent_run.id,
+            )
+        else:
+            # Zero cases — create the run directly and emit run_created only.
+            new_run = await repo.create_run(
+                project_id=parent_run.project_id,
+                title=f"Rerun: {parent_run.title}",
+                owner_id=owner_id,
+                environment_id=environment_id or parent_run.environment_id,
+                source=source,
+                parent_run_id=parent_run.id,
+            )
+            await repo.append_event(
+                run_id=new_run.id,
+                event_type="run_created",
+                payload={"title": new_run.title, "case_count": 0},
+                actor_user_id=owner_id,
+            )
+
         return new_run
 
     async def rerun_failed(
