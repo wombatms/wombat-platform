@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import base64
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 import pytest
@@ -30,7 +30,7 @@ _BASE_URL = "http://localhost:8000"
 _PROJECT = "acme"
 _RUN_ID = "11111111-1111-1111-1111-111111111111"
 _CASE_ID = "TC-LOGIN-001"
-_NOW = datetime.now(timezone.utc).isoformat()
+_NOW = datetime.now(UTC).isoformat()
 
 # Minimal RunDetailOut payload returned by the API.
 _RUN_DETAIL = {
@@ -715,3 +715,198 @@ async def test_registry_dispatches_close_run():
     )
 
     assert result["data"]["status"] == "completed"
+
+
+# ---------------------------------------------------------------------------
+# MCP Server error-envelope tests (Task 33)
+#
+# These tests exercise the full MCP Server call_tool handler path to verify
+# that 4xx REST errors are surfaced as isError=True CallToolResult envelopes
+# rather than protocol-level exceptions.  One test per SP3.3 tool.
+# ---------------------------------------------------------------------------
+
+
+def _make_call_tool_request(name: str, arguments: dict) -> mcp.types.CallToolRequest:
+    import mcp.types as t  # local import keeps top-level namespace clean
+
+    return t.CallToolRequest(params=t.CallToolRequestParams(name=name, arguments=arguments))
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_server_create_run_error_envelope():
+    """MCP server wraps create_run 422 into isError=True CallToolResult."""
+    import mcp.types as t
+
+    from wombat_mcp.main import create_server
+
+    server = create_server()
+    handler = server.request_handlers[t.CallToolRequest]
+
+    respx.post(f"{_BASE_URL}/api/projects/{_PROJECT}/runs").mock(
+        return_value=httpx.Response(
+            422,
+            json={"error": {"code": "validation_error", "message": "case_ids is empty"}},
+        )
+    )
+
+    req = _make_call_tool_request(
+        "create_run",
+        {"project": _PROJECT, "title": "Bad run", "case_selection": {"case_ids": []}},
+    )
+    result = await handler(req)
+
+    assert result.root.isError is True
+    error_text = result.root.content[0].text
+    assert "422" in error_text or "Unprocessable" in error_text
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_server_list_runs_error_envelope():
+    """MCP server wraps list_runs 403 into isError=True CallToolResult."""
+    import mcp.types as t
+
+    from wombat_mcp.main import create_server
+
+    server = create_server()
+    handler = server.request_handlers[t.CallToolRequest]
+
+    respx.get(f"{_BASE_URL}/api/projects/{_PROJECT}/runs").mock(
+        return_value=httpx.Response(403, json={"error": {"code": "forbidden"}})
+    )
+
+    req = _make_call_tool_request("list_runs", {"project": _PROJECT})
+    result = await handler(req)
+
+    assert result.root.isError is True
+    assert "403" in result.root.content[0].text or "Forbidden" in result.root.content[0].text
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_server_get_run_error_envelope():
+    """MCP server wraps get_run 404 into isError=True CallToolResult."""
+    import mcp.types as t
+
+    from wombat_mcp.main import create_server
+
+    server = create_server()
+    handler = server.request_handlers[t.CallToolRequest]
+
+    respx.get(f"{_BASE_URL}/api/projects/{_PROJECT}/runs/{_RUN_ID}").mock(
+        return_value=httpx.Response(404, json={"error": {"code": "run_not_found"}})
+    )
+
+    req = _make_call_tool_request("get_run", {"project": _PROJECT, "run_id": _RUN_ID})
+    result = await handler(req)
+
+    assert result.root.isError is True
+    assert "404" in result.root.content[0].text or "Not Found" in result.root.content[0].text
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_server_record_result_run_closed_error_envelope():
+    """MCP server wraps record_result run_closed 403 into isError=True CallToolResult."""
+    import mcp.types as t
+
+    from wombat_mcp.main import create_server
+
+    server = create_server()
+    handler = server.request_handlers[t.CallToolRequest]
+
+    respx.post(f"{_BASE_URL}/api/projects/{_PROJECT}/runs/{_RUN_ID}/results").mock(
+        return_value=httpx.Response(
+            403,
+            json={"error": {"code": "run_closed", "message": "Run is closed."}},
+        )
+    )
+
+    req = _make_call_tool_request(
+        "record_result",
+        {
+            "project": _PROJECT,
+            "run_id": _RUN_ID,
+            "items": {"case_id": _CASE_ID, "status": "pass"},
+        },
+    )
+    result = await handler(req)
+
+    assert result.root.isError is True
+    assert "403" in result.root.content[0].text or "Forbidden" in result.root.content[0].text
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_server_attach_evidence_no_result_error_envelope():
+    """MCP server wraps attach_evidence 422 no_result into isError=True CallToolResult."""
+    import base64 as _b64
+
+    import mcp.types as t
+
+    from wombat_mcp.main import create_server
+
+    server = create_server()
+    handler = server.request_handlers[t.CallToolRequest]
+
+    url = f"{_BASE_URL}/api/projects/{_PROJECT}/runs/{_RUN_ID}/results/{_CASE_ID}/evidence"
+    respx.post(url).mock(
+        return_value=httpx.Response(
+            422,
+            json={"error": {"code": "no_result", "message": "Record a result before attaching evidence."}},
+        )
+    )
+
+    raw = b"small file"
+    b64 = _b64.b64encode(raw).decode()
+
+    req = _make_call_tool_request(
+        "attach_evidence",
+        {
+            "project": _PROJECT,
+            "run_id": _RUN_ID,
+            "case_id": _CASE_ID,
+            "filename": "shot.png",
+            "mime_type": "image/png",
+            "base64_content": b64,
+        },
+    )
+    result = await handler(req)
+
+    assert result.root.isError is True
+    assert "422" in result.root.content[0].text or "Unprocessable" in result.root.content[0].text
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_server_close_run_already_closed_error_envelope():
+    """MCP server wraps close_run 409 already-closed into isError=True CallToolResult.
+
+    This is the canonical example from the Task 33 plan: 'close_run on already-closed
+    returns the error envelope in the tool response'.
+    """
+    import mcp.types as t
+
+    from wombat_mcp.main import create_server
+
+    server = create_server()
+    handler = server.request_handlers[t.CallToolRequest]
+
+    respx.post(f"{_BASE_URL}/api/projects/{_PROJECT}/runs/{_RUN_ID}/close").mock(
+        return_value=httpx.Response(
+            409,
+            json={"error": {"code": "run_closed", "message": "Run is already closed."}},
+        )
+    )
+
+    req = _make_call_tool_request(
+        "close_run",
+        {"project": _PROJECT, "run_id": _RUN_ID, "reason": "completed"},
+    )
+    result = await handler(req)
+
+    assert result.root.isError is True
+    # Error text contains the HTTP status code
+    error_text = result.root.content[0].text
+    assert "409" in error_text or "Conflict" in error_text
