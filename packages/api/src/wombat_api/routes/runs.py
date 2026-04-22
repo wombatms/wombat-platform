@@ -903,7 +903,7 @@ async def list_result_evidence(
 
     data = []
     for ev in evidence_rows:
-        actor_ref: "ActorRef | None" = None
+        actor_ref: ActorRef | None = None
         if ev.uploaded_by_user_id is not None:
             actor_ref = ActorRef(principal_type="user", id=ev.uploaded_by_user_id)
         elif ev.uploaded_by_token_id is not None:
