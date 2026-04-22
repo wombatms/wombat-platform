@@ -34,11 +34,9 @@ async def assert_run_actor_authorized(
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail={
-            "error": {
-                "code": "unauthorized_run_action",
-                "message": (
-                    "You have the required permission but are not the owner, an assignee, or an admin on this run."
-                ),
-            }
+            "code": "unauthorized_run_action",
+            "message": (
+                "You have the required permission but are not the owner, an assignee, or an admin on this run."
+            ),
         },
     )

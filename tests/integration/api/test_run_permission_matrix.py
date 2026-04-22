@@ -1113,7 +1113,7 @@ async def test_admin_create_run_201(httpx_client: AsyncClient, users, matrix_pro
     r = await httpx_client.post(
         f"/api/projects/{slug}/runs",
         headers={"Authorization": f"Bearer {admin_token}"},
-        json={"title": "Admin run", "case_selection": {"case_ids": []}},
+        json={"title": "Admin run", "case_selection": {"filter": {"q": "__no_match__"}}},
     )
     assert r.status_code == 201
 

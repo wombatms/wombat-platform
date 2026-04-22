@@ -29,7 +29,7 @@ async def test_permission_without_ownership_or_admin_is_blocked(db_session, samp
             is_admin=False,
         )
     assert exc.value.status_code == 403
-    assert exc.value.detail["error"]["code"] == "unauthorized_run_action"
+    assert exc.value.detail["code"] == "unauthorized_run_action"
 
 
 @pytest.mark.asyncio
