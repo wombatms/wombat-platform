@@ -19,14 +19,15 @@
  * with default exports.
  */
 
+import { useState, useCallback } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useRun, useRunCases } from "../hooks/runs";
 import { useResults } from "../hooks/results";
 import { useRecordWithConflictHandling } from "../lib/record";
-import { useActiveProject } from "@/features/projects/useActiveProject";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { FocusMode, type RunCaseWithSnapshot } from "../runner/FocusMode";
-import type { ResultStatus } from "../hooks/results";
+import { GridMode } from "../runner/GridMode";
+import type { ResultStatus, BugLink } from "../hooks/results";
 import type { CaseSnapshot } from "../runner/CaseRenderer";
 import type { Step } from "@/components/shared/StepTable";
 
@@ -125,8 +126,10 @@ export default function RunExecutePage() {
   const [searchParams] = useSearchParams();
   const view = (searchParams.get("view") as "focus" | "grid") ?? "focus";
 
-  // projectSlug comes from the URL; useActiveProject is only needed for the
-  // sidebar context — here we use the URL slug directly.
+  // Track the currently selected case index in grid mode so the record
+  // handler knows which case to record against.
+  const [gridSelectedIdx, setGridSelectedIdx] = useState(0);
+
   const slug = projectSlug ?? "";
   const runId = id ?? "";
 
@@ -209,18 +212,25 @@ export default function RunExecutePage() {
 
   // ---------------------------------------------------------------------------
   // Record handler — wires into useRecordWithConflictHandling
+  // In FocusMode the target case comes from the ?case= URL param.
+  // In GridMode it comes from the gridSelectedIdx state.
   // ---------------------------------------------------------------------------
 
   function handleRecord(
     status: ResultStatus,
     failedAtStep?: number,
     notes?: string | null,
-    bugLinks?: Array<{ url: string; title?: string | null; note?: string | null }>,
+    bugLinks?: BugLink[],
   ) {
-    const currentCaseParam = searchParams.get("case");
-    const currentCase = currentCaseParam
-      ? casesWithSnapshot.find((c) => c.wombat_id === currentCaseParam)
-      : casesWithSnapshot[0];
+    let currentCase: RunCaseWithSnapshot | undefined;
+    if (view === "grid") {
+      currentCase = casesWithSnapshot[gridSelectedIdx];
+    } else {
+      const currentCaseParam = searchParams.get("case");
+      currentCase = currentCaseParam
+        ? casesWithSnapshot.find((c) => c.wombat_id === currentCaseParam)
+        : casesWithSnapshot[0];
+    }
 
     if (!currentCase) return;
 
@@ -235,22 +245,29 @@ export default function RunExecutePage() {
   }
 
   // ---------------------------------------------------------------------------
+  // Evidence map (pre-computed for GridMode density)
+  // For now we derive it from results — a result row with evidence would need
+  // a dedicated evidence list query. We use a placeholder Map keyed by wombat_id.
+  // ---------------------------------------------------------------------------
+  const evidenceMap = new Map<string, boolean>();
+  // TODO: populate from useEvidence query when evidence list hook is available.
+
+  // ---------------------------------------------------------------------------
   // Route to view
   // ---------------------------------------------------------------------------
 
   if (view === "grid") {
-    // GridMode is implemented in Task 51. For now, fall through to FocusMode
-    // with a notice. The actual GridMode import is in RunExecutePage after Task 51.
-    // We use a dynamic check to avoid importing GridMode (code-split invariant).
     return (
-      <FocusMode
+      <GridMode
         projectSlug={slug}
         run={run}
         cases={casesWithSnapshot}
         results={resultsMap}
+        evidenceMap={evidenceMap}
         isPending={mutation.isPending}
         reconcile={reconcile}
         onRecord={handleRecord}
+        onSelectCase={setGridSelectedIdx}
         onClearReconcile={clearReconcile}
       />
     );
