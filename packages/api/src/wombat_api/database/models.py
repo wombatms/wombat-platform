@@ -255,3 +255,65 @@ class ProposalEventDB(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (Index("ix_proposal_event_proposal", "proposal_id", "created_at"),)
+
+
+# ---- Runs / Execution (SP3.3) ------------------------------------------------
+
+
+class EnvironmentDB(Base):
+    __tablename__ = "environments"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"))
+    name: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+
+    __table_args__ = (
+        Index(
+            "ux_environment_project_name",
+            "project_id",
+            "name",
+            unique=True,
+        ),
+    )
+
+
+class RunDB(Base):
+    __tablename__ = "runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"))
+    title: Mapped[str] = mapped_column(String)
+    status: Mapped[str] = mapped_column(String, default="open")
+    # open | completed | aborted
+    environment_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("environments.id", ondelete="SET NULL"), nullable=True
+    )
+    source: Mapped[str] = mapped_column(String, default="manual")
+    # manual | automated | ci | api | cli | mcp
+    owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    parent_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("runs.id"), nullable=True
+    )
+    # SP3.4 placeholder: nullable, no FK yet.
+    plan_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    closed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    closure_note: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        Index("ix_run_project_status_created", "project_id", "status", "created_at"),
+    )
