@@ -342,7 +342,8 @@ class RunAssigneeDB(Base):
     __table_args__ = (
         # Exactly one of user_id/token_id is set.
         CheckConstraint(
-            "(user_id IS NOT NULL)::int + (token_id IS NOT NULL)::int = 1",
+            "(CASE WHEN user_id IS NOT NULL THEN 1 ELSE 0 END) + "
+            "(CASE WHEN token_id IS NOT NULL THEN 1 ELSE 0 END) = 1",
             name="ck_run_assignee_exactly_one_principal",
         ),
         # Unique per run on whichever principal type is populated.
@@ -431,8 +432,8 @@ class ResultDB(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "(recorded_by_user_id IS NOT NULL)::int "
-            "+ (recorded_by_token_id IS NOT NULL)::int = 1",
+            "(CASE WHEN recorded_by_user_id IS NOT NULL THEN 1 ELSE 0 END) + "
+            "(CASE WHEN recorded_by_token_id IS NOT NULL THEN 1 ELSE 0 END) = 1",
             name="ck_result_exactly_one_recorder",
         ),
         Index("ux_result_unique_case", "run_id", "run_case_id", unique=True),
@@ -464,8 +465,8 @@ class ResultEvidenceDB(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "(uploaded_by_user_id IS NOT NULL)::int "
-            "+ (uploaded_by_token_id IS NOT NULL)::int = 1",
+            "(CASE WHEN uploaded_by_user_id IS NOT NULL THEN 1 ELSE 0 END) + "
+            "(CASE WHEN uploaded_by_token_id IS NOT NULL THEN 1 ELSE 0 END) = 1",
             name="ck_evidence_exactly_one_uploader",
         ),
     )
