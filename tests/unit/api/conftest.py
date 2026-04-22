@@ -132,6 +132,33 @@ async def sample_run(db_session, sample_project, sample_user) -> RunDB:
 
 
 @pytest_asyncio.fixture
+async def two_testcases(db_session, sample_project) -> list[Content]:
+    """Two Content rows (kind=testcase) with distinct wombat_ids, both in sample_project."""
+    rows: list[Content] = []
+    for i in range(1, 3):
+        row = Content(
+            id=uuid.uuid4(),
+            project_id=sample_project.id,
+            kind="testcase",
+            wombat_id=f"TC-{i:04d}",
+            title=f"Testcase {i}",
+            tags=[],
+            body={
+                "frontmatter": {"id": f"TC-{i:04d}", "title": f"Testcase {i}"},
+                "markdown": f"Step {i}: do something",
+            },
+            source_repo="test-repo",
+            source_path=f"cases/tc_{i}.md",
+            source_revision="abc123",
+            content_hash=f"initial-hash-{i}",
+        )
+        db_session.add(row)
+        rows.append(row)
+    await db_session.flush()
+    return rows
+
+
+@pytest_asyncio.fixture
 async def sample_run_case(
     db_session, sample_run, sample_testcase, sample_user
 ) -> RunCaseDB:
