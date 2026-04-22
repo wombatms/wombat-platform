@@ -25,6 +25,13 @@ from wombat_api.database.models import (
     ProjectDB,
     ProposalDB,
     ProposalEventDB,
+    ResultDB,
+    ResultEvidenceDB,
+    RunAssigneeDB,
+    RunCaseDB,
+    RunCaseSnapshotDB,
+    RunDB,
+    RunEventDB,
     SyncLogDB,
     UserDB,
     UserProjectRoleDB,
@@ -829,3 +836,78 @@ class Repository:
             )
             .values(stale_embedding=True)
         )
+
+    # --- Environments (SP3.3) -----------------------------------------------
+
+    async def list_environments(self, project_id: uuid.UUID) -> list[EnvironmentDB]:
+        result = await self.session.execute(
+            select(EnvironmentDB)
+            .where(EnvironmentDB.project_id == project_id)
+            .order_by(EnvironmentDB.name)
+        )
+        return list(result.scalars().all())
+
+    async def create_environment(
+        self, *, project_id: uuid.UUID, name: str, user_id: uuid.UUID
+    ) -> EnvironmentDB:
+        row = EnvironmentDB(
+            project_id=project_id,
+            name=name,
+            created_by_user_id=user_id,
+        )
+        self.session.add(row)
+        await self.session.flush()
+        return row
+
+    async def delete_environment(self, env_id: uuid.UUID) -> None:
+        env = await self.session.get(EnvironmentDB, env_id)
+        if env is None:
+            return
+        await self.session.delete(env)
+        await self.session.flush()
+
+    # --- Run case snapshots (SP3.3) ------------------------------------------
+
+    async def upsert_run_case_snapshot(
+        self,
+        *,
+        content: Content,
+        resolved_body: dict,
+        content_hash: str,
+    ) -> RunCaseSnapshotDB:
+        """Inserts a snapshot if content_hash is new; returns existing otherwise.
+
+        Catches IntegrityError on concurrent inserts and falls back to a
+        re-select so that racing writers converge on the same snapshot row.
+        Closed runs stay pinned to their snapshots by (run_cases.snapshot_id),
+        never to the live Content row.
+        """
+        existing = await self.session.execute(
+            select(RunCaseSnapshotDB).where(
+                RunCaseSnapshotDB.content_hash == content_hash
+            )
+        )
+        row = existing.scalar_one_or_none()
+        if row is not None:
+            return row
+        row = RunCaseSnapshotDB(
+            content_hash=content_hash,
+            content_id=content.id,
+            snapshot_body=resolved_body,
+            snapshot_title=content.title,
+            snapshot_wombat_id=content.wombat_id or "",
+        )
+        self.session.add(row)
+        try:
+            await self.session.flush()
+        except IntegrityError:
+            # Racing insert — fall back to re-select.
+            await self.session.rollback()
+            return (
+                await self.session.execute(
+                    select(RunCaseSnapshotDB).where(
+                        RunCaseSnapshotDB.content_hash == content_hash
+                    )
+                )
+            ).scalar_one()
+        return row

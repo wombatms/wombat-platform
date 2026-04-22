@@ -12,7 +12,7 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from wombat_api.database.engine import Base
-from wombat_api.database.models import ProjectDB, UserDB
+from wombat_api.database.models import Content, ProjectDB, UserDB
 
 
 @pytest_asyncio.fixture
@@ -52,3 +52,27 @@ async def sample_project(db_session) -> ProjectDB:
     db_session.add(project)
     await db_session.flush()
     return project
+
+
+@pytest_asyncio.fixture
+async def sample_testcase(db_session, sample_project) -> Content:
+    """Minimal Content row (kind=testcase) for snapshot / run_case tests."""
+    row = Content(
+        id=uuid.uuid4(),
+        project_id=sample_project.id,
+        kind="testcase",
+        wombat_id="TC-0001",
+        title="Sample Testcase",
+        tags=[],
+        body={
+            "frontmatter": {"id": "TC-0001", "title": "Sample Testcase"},
+            "markdown": "1. Do a thing\n2. Observe result",
+        },
+        source_repo="test-repo",
+        source_path="cases/sample.md",
+        source_revision="deadbeef",
+        content_hash="hash-initial",
+    )
+    db_session.add(row)
+    await db_session.flush()
+    return row
