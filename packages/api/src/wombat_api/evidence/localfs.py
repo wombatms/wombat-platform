@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import hmac
 import os
@@ -84,10 +85,8 @@ class LocalFSBackend:
         return self._root / blob_id
 
     def _remove_if_exists(self, path: Path) -> None:
-        try:
+        with contextlib.suppress(FileNotFoundError):
             path.unlink()
-        except FileNotFoundError:
-            pass
 
     def _sign(self, blob_id: str, exp: int) -> str:
         message = f"{blob_id}:{exp}".encode()

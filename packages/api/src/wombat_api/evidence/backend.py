@@ -45,7 +45,7 @@ class EvidenceBackend(Protocol):
         ...
 
 
-def make_evidence_backend(cfg: "EvidenceConfig") -> EvidenceBackend:
+def make_evidence_backend(cfg: EvidenceConfig) -> EvidenceBackend:
     """Instantiate the backend selected by *cfg.backend*."""
     from wombat_api.evidence.localfs import LocalFSBackend
     from wombat_api.evidence.s3 import S3Backend
