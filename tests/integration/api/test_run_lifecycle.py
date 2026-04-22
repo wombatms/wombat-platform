@@ -12,7 +12,6 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
 # ---------------------------------------------------------------------------
 # Shared fixture helpers
 # ---------------------------------------------------------------------------
@@ -38,12 +37,10 @@ async def _seed_testcase(db_session: AsyncSession, project_id: uuid.UUID, wombat
     return row
 
 
-async def _create_run(client: AsyncClient, slug: str, token: str, title: str = "Test run", case_ids: list[str] | None = None) -> str:
-    if case_ids:
-        selection = {"case_ids": case_ids}
-    else:
-        # Use a filter that returns no rows (empty run)
-        selection = {"filter": {"q": "__no_match_empty_run__"}}
+async def _create_run(
+    client: AsyncClient, slug: str, token: str, title: str = "Test run", case_ids: list[str] | None = None
+) -> str:
+    selection = {"case_ids": case_ids} if case_ids else {"filter": {"q": "__no_match_empty_run__"}}
     r = await client.post(
         f"/api/projects/{slug}/runs",
         json={"title": title, "case_selection": selection},
@@ -182,13 +179,16 @@ async def test_remove_case_happy_path(
     assert r.status_code == 200
 
     # List run cases via internal repository to get run_case_id
-    from wombat_api.database.repository import Repository
     from sqlalchemy.ext.asyncio import async_sessionmaker
+
     import wombat_api.database.engine as _engine_mod
+    from wombat_api.database.repository import Repository
+
     factory = async_sessionmaker(_engine_mod.engine, expire_on_commit=False)
     async with factory() as s:
         repo = Repository(s)
         import uuid as _uuid
+
         run_cases = await repo.list_run_cases(_uuid.UUID(run_id))
     assert len(run_cases) == 1
     rc_id = str(run_cases[0].id)

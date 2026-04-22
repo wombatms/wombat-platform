@@ -29,9 +29,7 @@ async def assert_run_actor_authorized(
     if user_id is not None and run.owner_id == user_id:
         return
     repo = Repository(session)
-    if await repo.is_principal_on_run(
-        run_id=run.id, user_id=user_id, token_id=token_id
-    ):
+    if await repo.is_principal_on_run(run_id=run.id, user_id=user_id, token_id=token_id):
         return
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
@@ -39,8 +37,7 @@ async def assert_run_actor_authorized(
             "error": {
                 "code": "unauthorized_run_action",
                 "message": (
-                    "You have the required permission but are not the owner, "
-                    "an assignee, or an admin on this run."
+                    "You have the required permission but are not the owner, an assignee, or an admin on this run."
                 ),
             }
         },

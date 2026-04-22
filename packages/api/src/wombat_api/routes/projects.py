@@ -28,10 +28,12 @@ from wombat_api.schemas.common import ProjectCreate
 
 # Permissions that require admin issuer — editors may NOT grant these
 # even if they somehow hold them transitively.
-_ADMIN_ONLY_GRANTS: frozenset[Permission] = frozenset({
-    Permission.CONTENT_PUBLISH_DIRECT,
-    Permission.RUNS_REOPEN,
-})
+_ADMIN_ONLY_GRANTS: frozenset[Permission] = frozenset(
+    {
+        Permission.CONTENT_PUBLISH_DIRECT,
+        Permission.RUNS_REOPEN,
+    }
+)
 
 router = APIRouter()
 
@@ -239,8 +241,8 @@ async def create_project_token(
 
     try:
         role = Role[role_str]
-    except KeyError:
-        raise HTTPException(status_code=403, detail="No access")
+    except KeyError as exc:
+        raise HTTPException(status_code=403, detail="No access") from exc
 
     is_admin = role == Role.admin
     caller_perms: frozenset[Permission] = role_permissions(role)
@@ -248,24 +250,21 @@ async def create_project_token(
     # Resolve requested permissions.
     if body.permissions is None:
         # Default: caller's role-default runs:* subset.
-        granted_perms: list[str] = [
-            str(p) for p in caller_perms
-            if p.value.startswith("runs:")
-        ]
+        granted_perms: list[str] = [str(p) for p in caller_perms if p.value.startswith("runs:")]
     else:
         # Validate each requested permission.
         requested: list[Permission] = []
         for perm_str in body.permissions:
             try:
                 perm = Permission(perm_str)
-            except ValueError:
+            except ValueError as exc:
                 raise HTTPException(
                     status_code=422,
                     detail={
                         "code": "invalid_permission",
                         "message": f"Unknown permission: {perm_str!r}",
                     },
-                )
+                ) from exc
             # Admin-only permissions require admin issuer.
             if perm in _ADMIN_ONLY_GRANTS and not is_admin:
                 raise HTTPException(
@@ -281,9 +280,7 @@ async def create_project_token(
                     status_code=403,
                     detail={
                         "code": "cannot_grant_unowned_permission",
-                        "message": (
-                            f"Issuer does not hold {perm.value} and cannot grant it"
-                        ),
+                        "message": (f"Issuer does not hold {perm.value} and cannot grant it"),
                     },
                 )
             requested.append(perm)

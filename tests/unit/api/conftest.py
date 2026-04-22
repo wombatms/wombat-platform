@@ -159,9 +159,7 @@ async def two_testcases(db_session, sample_project) -> list[Content]:
 
 
 @pytest_asyncio.fixture
-async def sample_run_case(
-    db_session, sample_run, sample_testcase, sample_user
-) -> RunCaseDB:
+async def sample_run_case(db_session, sample_run, sample_testcase, sample_user) -> RunCaseDB:
     """RunCase pointing to a freshly-created snapshot of sample_testcase."""
     snap = RunCaseSnapshotDB(
         id=uuid.uuid4(),

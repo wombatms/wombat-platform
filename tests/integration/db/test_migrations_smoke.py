@@ -49,8 +49,7 @@ _SHORT_CIRCUIT_URL: str | None = os.environ.get("WOMBAT_TEST_DATABASE_URL")
 
 if _SHORT_CIRCUIT_URL is None and not _docker_available():
     pytest.skip(
-        "Docker is not available and WOMBAT_TEST_DATABASE_URL is not set; "
-        "skipping migration smoke tests.",
+        "Docker is not available and WOMBAT_TEST_DATABASE_URL is not set; skipping migration smoke tests.",
         allow_module_level=True,
     )
 
@@ -114,9 +113,7 @@ def _fresh_database(pg_dsn: str) -> str:
     new_dsn = urlunparse(parsed._replace(path=f"/{new_db}"))
 
     async def _install_vector() -> None:
-        conn = await asyncpg.connect(
-            new_dsn.replace("postgresql+asyncpg://", "postgresql://", 1)
-        )
+        conn = await asyncpg.connect(new_dsn.replace("postgresql+asyncpg://", "postgresql://", 1))
         try:
             await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
         finally:
@@ -146,9 +143,7 @@ def test_alembic_upgrade_head_creates_all_sp3_3_tables(pg_dsn: str) -> None:
         env=env,
         timeout=120,
     )
-    assert result.returncode == 0, (
-        f"alembic upgrade head failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
-    )
+    assert result.returncode == 0, f"alembic upgrade head failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
 
     async def _inspect() -> set[str]:
         eng = create_async_engine(dsn)
@@ -165,6 +160,4 @@ def test_alembic_upgrade_head_creates_all_sp3_3_tables(pg_dsn: str) -> None:
     assert not missing, f"Missing SP3.3 tables after upgrade head: {sorted(missing)}"
 
     # SP2 runs scaffolding must have been dropped by the SP3.3 migration.
-    assert "execution_results" not in tables, (
-        "SP2 execution_results table should have been dropped by SP3.3 migration"
-    )
+    assert "execution_results" not in tables, "SP2 execution_results table should have been dropped by SP3.3 migration"

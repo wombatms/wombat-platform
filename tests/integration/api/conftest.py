@@ -25,6 +25,7 @@ from __future__ import annotations
 import os
 import uuid
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 
 import pytest
 import pytest_asyncio
@@ -412,12 +413,10 @@ async def temp_git_project(tmp_path_factory, monkeypatch, db_session: AsyncSessi
 # ---------------------------------------------------------------------------
 
 
-from dataclasses import dataclass
-
-
 @dataclass
 class RunFixture:
     """Holds a seeded run with its project slug and case wombat_ids."""
+
     id: str
     project_slug: str
     case_ids: list[str]

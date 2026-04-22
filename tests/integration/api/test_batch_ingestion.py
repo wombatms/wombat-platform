@@ -68,18 +68,13 @@ async def test_300_item_batch_5_unknown(
     # All failures must report case_not_in_run.
     for item in fail_items:
         assert item["error"]["code"] == "case_not_in_run", (
-            f"Expected 'case_not_in_run' but got {item['error']['code']!r} "
-            f"for case_id={item['case_id']!r}"
+            f"Expected 'case_not_in_run' but got {item['error']['code']!r} for case_id={item['case_id']!r}"
         )
-        assert item["case_id"] in unknown_ids, (
-            f"Unexpected failing case_id: {item['case_id']!r}"
-        )
+        assert item["case_id"] in unknown_ids, f"Unexpected failing case_id: {item['case_id']!r}"
 
     # All successes must have a revision.
     for item in ok_items:
-        assert item.get("revision") == 1, (
-            f"Expected revision=1 for fresh result, got {item.get('revision')!r}"
-        )
+        assert item.get("revision") == 1, f"Expected revision=1 for fresh result, got {item.get('revision')!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -138,12 +133,8 @@ async def test_if_match_conflict_second_writer_loses(
     )
     assert r3.status_code == 200, r3.text
     item3 = r3.json()["results"][0]
-    assert item3["ok"] is False, (
-        "Stale if_match_revision should yield ok=False"
-    )
-    assert item3["error"]["code"] == "result_conflict", (
-        f"Expected 'result_conflict', got {item3['error']['code']!r}"
-    )
+    assert item3["ok"] is False, "Stale if_match_revision should yield ok=False"
+    assert item3["error"]["code"] == "result_conflict", f"Expected 'result_conflict', got {item3['error']['code']!r}"
     assert item3["error"]["current_revision"] == 2, (
         f"Expected current_revision=2, got {item3['error'].get('current_revision')!r}"
     )
@@ -225,9 +216,7 @@ async def test_retry_after_conflict_succeeds(
     assert r3.status_code == 200, r3.text
     item_retry = r3.json()["results"][0]
     assert item_retry["ok"] is True
-    assert item_retry["revision"] == 2, (
-        f"Retry after conflict should yield revision=2, got {item_retry['revision']!r}"
-    )
+    assert item_retry["revision"] == 2, f"Retry after conflict should yield revision=2, got {item_retry['revision']!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -283,6 +272,4 @@ async def test_duplicate_retry_ticks_revision(
     rev2 = item2["revision"]
     # The revision bumps — this is the known "idempotent in practice" behaviour.
     # We assert it is strictly greater to document the server's behaviour.
-    assert rev2 > rev1, (
-        f"Expected revision to tick on duplicate write; got rev1={rev1}, rev2={rev2}"
-    )
+    assert rev2 > rev1, f"Expected revision to tick on duplicate write; got rev1={rev1}, rev2={rev2}"

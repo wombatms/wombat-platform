@@ -305,9 +305,7 @@ def test_build_tool_registry_api_mode():
     # All tools are either api:-prefixed (SP2) or bare-named execution tools (SP3.3).
     sp33_names = {"create_run", "list_runs", "get_run", "record_result", "attach_evidence", "close_run"}
     for name in names:
-        assert name.startswith("api:") or name in sp33_names, (
-            f"Unexpected tool name in api mode: {name!r}"
-        )
+        assert name.startswith("api:") or name in sp33_names, f"Unexpected tool name in api mode: {name!r}"
 
 
 def test_build_tool_registry_both_mode():

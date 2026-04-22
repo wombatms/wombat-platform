@@ -15,18 +15,14 @@ from wombat_api.runs.service import RunService
 
 
 @pytest.mark.asyncio
-async def test_snapshot_is_frozen_after_case_edit(
-    db_session, sample_project, sample_user, two_testcases
-):
+async def test_snapshot_is_frozen_after_case_edit(db_session, sample_project, sample_user, two_testcases):
     """Editing a Content row after run creation must not alter the snapshot hash."""
     svc = RunService(db_session)
     run = await svc.create_run(
         project_id=sample_project.id,
         owner_id=sample_user.id,
         title="R1",
-        case_selection=CaseSelection(
-            case_ids=[two_testcases[0].wombat_id, two_testcases[1].wombat_id]
-        ),
+        case_selection=CaseSelection(case_ids=[two_testcases[0].wombat_id, two_testcases[1].wombat_id]),
     )
 
     # Record the hash of the first case's snapshot.
@@ -37,12 +33,11 @@ async def test_snapshot_is_frozen_after_case_edit(
     # Fetch the snapshot for the first run_case.
     rc0 = run_cases[0]
     from sqlalchemy import select
+
     from wombat_api.database.models import RunCaseSnapshotDB
 
     snap = (
-        await db_session.execute(
-            select(RunCaseSnapshotDB).where(RunCaseSnapshotDB.id == rc0.snapshot_id)
-        )
+        await db_session.execute(select(RunCaseSnapshotDB).where(RunCaseSnapshotDB.id == rc0.snapshot_id))
     ).scalar_one()
     original_hash = snap.content_hash
 
@@ -55,24 +50,18 @@ async def test_snapshot_is_frozen_after_case_edit(
 
     # Re-load snapshot; hash must be unchanged.
     await db_session.refresh(snap)
-    assert snap.content_hash == original_hash, (
-        "Snapshot hash changed after Content edit — snapshot was not frozen."
-    )
+    assert snap.content_hash == original_hash, "Snapshot hash changed after Content edit — snapshot was not frozen."
 
 
 @pytest.mark.asyncio
-async def test_create_run_returns_correct_case_count(
-    db_session, sample_project, sample_user, two_testcases
-):
+async def test_create_run_returns_correct_case_count(db_session, sample_project, sample_user, two_testcases):
     """create_run must insert exactly as many run_cases as selected."""
     svc = RunService(db_session)
     run = await svc.create_run(
         project_id=sample_project.id,
         owner_id=sample_user.id,
         title="R2",
-        case_selection=CaseSelection(
-            case_ids=[two_testcases[0].wombat_id, two_testcases[1].wombat_id]
-        ),
+        case_selection=CaseSelection(case_ids=[two_testcases[0].wombat_id, two_testcases[1].wombat_id]),
     )
 
     repo = Repository(db_session)
@@ -81,9 +70,7 @@ async def test_create_run_returns_correct_case_count(
 
 
 @pytest.mark.asyncio
-async def test_create_run_display_order_is_preserved(
-    db_session, sample_project, sample_user, two_testcases
-):
+async def test_create_run_display_order_is_preserved(db_session, sample_project, sample_user, two_testcases):
     """Run cases must be inserted in the order the caller requested them."""
     svc = RunService(db_session)
     # Pass TC-0002 first, TC-0001 second — order must be preserved.
@@ -91,9 +78,7 @@ async def test_create_run_display_order_is_preserved(
         project_id=sample_project.id,
         owner_id=sample_user.id,
         title="R3",
-        case_selection=CaseSelection(
-            case_ids=[two_testcases[1].wombat_id, two_testcases[0].wombat_id]
-        ),
+        case_selection=CaseSelection(case_ids=[two_testcases[1].wombat_id, two_testcases[0].wombat_id]),
     )
 
     repo = Repository(db_session)
@@ -104,26 +89,21 @@ async def test_create_run_display_order_is_preserved(
 
     # Confirm snapshot wombat_ids match the requested order.
     from sqlalchemy import select
+
     from wombat_api.database.models import RunCaseSnapshotDB
 
     snap0 = (
-        await db_session.execute(
-            select(RunCaseSnapshotDB).where(RunCaseSnapshotDB.id == run_cases[0].snapshot_id)
-        )
+        await db_session.execute(select(RunCaseSnapshotDB).where(RunCaseSnapshotDB.id == run_cases[0].snapshot_id))
     ).scalar_one()
     snap1 = (
-        await db_session.execute(
-            select(RunCaseSnapshotDB).where(RunCaseSnapshotDB.id == run_cases[1].snapshot_id)
-        )
+        await db_session.execute(select(RunCaseSnapshotDB).where(RunCaseSnapshotDB.id == run_cases[1].snapshot_id))
     ).scalar_one()
     assert snap0.snapshot_wombat_id == two_testcases[1].wombat_id
     assert snap1.snapshot_wombat_id == two_testcases[0].wombat_id
 
 
 @pytest.mark.asyncio
-async def test_create_run_dedupes_identical_snapshots(
-    db_session, sample_project, sample_user, two_testcases
-):
+async def test_create_run_dedupes_identical_snapshots(db_session, sample_project, sample_user, two_testcases):
     """Two runs with the same cases must share the same snapshot rows (content-hash dedup)."""
     svc = RunService(db_session)
     run1 = await svc.create_run(
@@ -155,9 +135,7 @@ async def test_create_run_emits_run_created_and_case_added_events(
         project_id=sample_project.id,
         owner_id=sample_user.id,
         title="Evt Test",
-        case_selection=CaseSelection(
-            case_ids=[two_testcases[0].wombat_id, two_testcases[1].wombat_id]
-        ),
+        case_selection=CaseSelection(case_ids=[two_testcases[0].wombat_id, two_testcases[1].wombat_id]),
     )
 
     repo = Repository(db_session)
@@ -170,18 +148,14 @@ async def test_create_run_emits_run_created_and_case_added_events(
 
 
 @pytest.mark.asyncio
-async def test_create_run_skips_unknown_wombat_ids(
-    db_session, sample_project, sample_user, two_testcases
-):
+async def test_create_run_skips_unknown_wombat_ids(db_session, sample_project, sample_user, two_testcases):
     """Unknown wombat_ids in case_ids must be silently skipped (not raise)."""
     svc = RunService(db_session)
     run = await svc.create_run(
         project_id=sample_project.id,
         owner_id=sample_user.id,
         title="R-partial",
-        case_selection=CaseSelection(
-            case_ids=[two_testcases[0].wombat_id, "TC-DOES-NOT-EXIST"]
-        ),
+        case_selection=CaseSelection(case_ids=[two_testcases[0].wombat_id, "TC-DOES-NOT-EXIST"]),
     )
 
     repo = Repository(db_session)
@@ -190,9 +164,7 @@ async def test_create_run_skips_unknown_wombat_ids(
 
 
 @pytest.mark.asyncio
-async def test_create_run_with_shared_step_inlining(
-    db_session, sample_project, sample_user
-):
+async def test_create_run_with_shared_step_inlining(db_session, sample_project, sample_user):
     """Shared-step references in a testcase body must be inlined into the snapshot."""
     from wombat_api.database.models import Content
 
@@ -250,12 +222,11 @@ async def test_create_run_with_shared_step_inlining(
     assert len(run_cases) == 1
 
     from sqlalchemy import select
+
     from wombat_api.database.models import RunCaseSnapshotDB
 
     snap = (
-        await db_session.execute(
-            select(RunCaseSnapshotDB).where(RunCaseSnapshotDB.id == run_cases[0].snapshot_id)
-        )
+        await db_session.execute(select(RunCaseSnapshotDB).where(RunCaseSnapshotDB.id == run_cases[0].snapshot_id))
     ).scalar_one()
 
     # Snapshot body should contain inlined_shared_steps.

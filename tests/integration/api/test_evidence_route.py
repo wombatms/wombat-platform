@@ -6,12 +6,9 @@ app.state.evidence_backend.
 
 from __future__ import annotations
 
-import io
-
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-
 
 # ---------------------------------------------------------------------------
 # Fixture: override evidence backend to use tmp_path
@@ -61,12 +58,14 @@ async def test_upload_get_url_delete(
     tmp_path,
 ):
     """Upload evidence → get signed URL → delete."""
-    from wombat_api.evidence.deps import get_evidence_backend
+    from httpx import ASGITransport
+    from httpx import AsyncClient as _AsyncClient
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    import wombat_api.database.engine as _engine_mod
     from wombat_api.app import create_app
     from wombat_api.database.engine import get_session
-    import wombat_api.database.engine as _engine_mod
-    from sqlalchemy.ext.asyncio import async_sessionmaker
-    from httpx import ASGITransport, AsyncClient as _AsyncClient
+    from wombat_api.evidence.deps import get_evidence_backend
 
     app = create_app()
 
@@ -126,13 +125,15 @@ async def test_upload_evidence_too_large(
     tmp_path,
 ):
     """Upload exceeding max_file_mb returns 413 evidence_too_large."""
-    from wombat_api.evidence.localfs import LocalFSBackend
-    from wombat_api.evidence.deps import get_evidence_backend
+    from httpx import ASGITransport
+    from httpx import AsyncClient as _AsyncClient
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    import wombat_api.database.engine as _engine_mod
     from wombat_api.app import create_app
     from wombat_api.database.engine import get_session
-    import wombat_api.database.engine as _engine_mod
-    from sqlalchemy.ext.asyncio import async_sessionmaker
-    from httpx import ASGITransport, AsyncClient as _AsyncClient
+    from wombat_api.evidence.deps import get_evidence_backend
+    from wombat_api.evidence.localfs import LocalFSBackend
 
     app = create_app()
     backend = LocalFSBackend(root=tmp_path, signing_key="test-secret")
@@ -147,11 +148,13 @@ async def test_upload_evidence_too_large(
 
     # Patch config to have a tiny max
     from wombat_api import config as _cfg_mod
+
     original_get_config = _cfg_mod.get_config
 
     def _tiny_config():
+
         from wombat_api.config import Config, EvidenceConfig
-        from pathlib import Path
+
         ev_cfg = EvidenceConfig(backend="localfs", root=tmp_path, max_file_mb=1)
         return Config(
             database_url="postgresql+asyncpg://x:x@localhost/x",

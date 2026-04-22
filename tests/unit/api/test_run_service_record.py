@@ -23,7 +23,6 @@ from wombat_api.runs.exceptions import RunClosedError, RunNotOpenError
 from wombat_api.runs.schemas import CaseSelection, RecordResultItem
 from wombat_api.runs.service import RunService
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -40,9 +39,7 @@ async def _create_run_with_cases(
         project_id=project_id,
         owner_id=owner_id,
         title=title,
-        case_selection=CaseSelection(
-            case_ids=[two_testcases[0].wombat_id, two_testcases[1].wombat_id]
-        ),
+        case_selection=CaseSelection(case_ids=[two_testcases[0].wombat_id, two_testcases[1].wombat_id]),
     )
 
 
@@ -52,9 +49,7 @@ async def _create_run_with_cases(
 
 
 @pytest.mark.asyncio
-async def test_record_batch_both_succeed_revision_one(
-    db_session, sample_project, sample_user, two_testcases
-):
+async def test_record_batch_both_succeed_revision_one(db_session, sample_project, sample_user, two_testcases):
     """Two items in a batch both get ok=True with revision=1 on first record."""
     svc = RunService(db_session)
     run = await _create_run_with_cases(svc, sample_project.id, sample_user.id, two_testcases)
@@ -79,9 +74,7 @@ async def test_record_batch_both_succeed_revision_one(
 
 
 @pytest.mark.asyncio
-async def test_record_batch_matching_if_match_bumps_revision(
-    db_session, sample_project, sample_user, two_testcases
-):
+async def test_record_batch_matching_if_match_bumps_revision(db_session, sample_project, sample_user, two_testcases):
     """Updating with a correct if_match_revision=1 returns revision=2."""
     svc = RunService(db_session)
     run = await _create_run_with_cases(svc, sample_project.id, sample_user.id, two_testcases)
@@ -152,9 +145,7 @@ async def test_record_batch_mismatched_if_match_returns_conflict(
 
 
 @pytest.mark.asyncio
-async def test_record_batch_case_not_in_run_returns_error(
-    db_session, sample_project, sample_user, two_testcases
-):
+async def test_record_batch_case_not_in_run_returns_error(db_session, sample_project, sample_user, two_testcases):
     """Recording a result for a case not in the run returns ok=False."""
     svc = RunService(db_session)
     run = await _create_run_with_cases(svc, sample_project.id, sample_user.id, two_testcases)
@@ -172,9 +163,7 @@ async def test_record_batch_case_not_in_run_returns_error(
 
 
 @pytest.mark.asyncio
-async def test_record_batch_closed_run_raises_run_closed_error(
-    db_session, sample_project, sample_user, two_testcases
-):
+async def test_record_batch_closed_run_raises_run_closed_error(db_session, sample_project, sample_user, two_testcases):
     """Recording to a closed run must raise RunClosedError at the service layer."""
     svc = RunService(db_session)
     run = await _create_run_with_cases(svc, sample_project.id, sample_user.id, two_testcases)
@@ -199,9 +188,7 @@ async def test_record_batch_closed_run_raises_run_closed_error(
 
 
 @pytest.mark.asyncio
-async def test_record_batch_first_result_stamps_started_at(
-    db_session, sample_project, sample_user, two_testcases
-):
+async def test_record_batch_first_result_stamps_started_at(db_session, sample_project, sample_user, two_testcases):
     """The first result batch on a run must set started_at."""
     svc = RunService(db_session)
     run = await _create_run_with_cases(svc, sample_project.id, sample_user.id, two_testcases)
@@ -259,9 +246,7 @@ async def test_record_batch_partial_success_does_not_block_good_items(
 
 
 @pytest.mark.asyncio
-async def test_record_batch_emits_result_recorded_event(
-    db_session, sample_project, sample_user, two_testcases
-):
+async def test_record_batch_emits_result_recorded_event(db_session, sample_project, sample_user, two_testcases):
     """result_recorded event must be appended for revision=1 results."""
     svc = RunService(db_session)
     run = await _create_run_with_cases(svc, sample_project.id, sample_user.id, two_testcases)
@@ -281,9 +266,7 @@ async def test_record_batch_emits_result_recorded_event(
 
 
 @pytest.mark.asyncio
-async def test_record_batch_emits_result_updated_event(
-    db_session, sample_project, sample_user, two_testcases
-):
+async def test_record_batch_emits_result_updated_event(db_session, sample_project, sample_user, two_testcases):
     """result_updated event must be appended for revision > 1 updates."""
     svc = RunService(db_session)
     run = await _create_run_with_cases(svc, sample_project.id, sample_user.id, two_testcases)
@@ -321,9 +304,7 @@ async def test_record_batch_emits_result_updated_event(
 
 
 @pytest.mark.asyncio
-async def test_close_completed_sets_status_and_closed_at(
-    db_session, sample_project, sample_user, two_testcases
-):
+async def test_close_completed_sets_status_and_closed_at(db_session, sample_project, sample_user, two_testcases):
     """close_run(reason='completed') sets status=completed and stamps closed_at."""
     svc = RunService(db_session)
     run = await _create_run_with_cases(svc, sample_project.id, sample_user.id, two_testcases)
@@ -341,9 +322,7 @@ async def test_close_completed_sets_status_and_closed_at(
 
 
 @pytest.mark.asyncio
-async def test_close_completed_appends_run_closed_event(
-    db_session, sample_project, sample_user, two_testcases
-):
+async def test_close_completed_appends_run_closed_event(db_session, sample_project, sample_user, two_testcases):
     """close_run(reason='completed') must append a run_closed event."""
     svc = RunService(db_session)
     run = await _create_run_with_cases(svc, sample_project.id, sample_user.id, two_testcases)
@@ -386,9 +365,7 @@ async def test_close_aborted_sets_status_and_appends_run_aborted(
 
 
 @pytest.mark.asyncio
-async def test_reopen_clears_closed_at_and_emits_run_reopened(
-    db_session, sample_project, sample_user, two_testcases
-):
+async def test_reopen_clears_closed_at_and_emits_run_reopened(db_session, sample_project, sample_user, two_testcases):
     """reopen_run must reset status, clear closed_at, append run_reopened event."""
     svc = RunService(db_session)
     run = await _create_run_with_cases(svc, sample_project.id, sample_user.id, two_testcases)
@@ -434,9 +411,7 @@ async def test_reopen_already_open_run_raises_run_not_open_error(
 
 
 @pytest.mark.asyncio
-async def test_rerun_failed_creates_new_run_with_parent_id(
-    db_session, sample_project, sample_user, two_testcases
-):
+async def test_rerun_failed_creates_new_run_with_parent_id(db_session, sample_project, sample_user, two_testcases):
     """rerun_failed must set parent_run_id on the new run."""
     svc = RunService(db_session)
     run = await _create_run_with_cases(svc, sample_project.id, sample_user.id, two_testcases)
@@ -463,9 +438,7 @@ async def test_rerun_failed_creates_new_run_with_parent_id(
 
 
 @pytest.mark.asyncio
-async def test_rerun_failed_includes_only_fail_and_blocked(
-    db_session, sample_project, sample_user, two_testcases
-):
+async def test_rerun_failed_includes_only_fail_and_blocked(db_session, sample_project, sample_user, two_testcases):
     """rerun_failed must include only cases with fail or blocked status."""
     svc = RunService(db_session)
     run = await _create_run_with_cases(svc, sample_project.id, sample_user.id, two_testcases)
@@ -493,12 +466,11 @@ async def test_rerun_failed_includes_only_fail_and_blocked(
     assert len(new_cases) == 1
 
     from sqlalchemy import select
+
     from wombat_api.database.models import RunCaseSnapshotDB
 
     snap = (
-        await db_session.execute(
-            select(RunCaseSnapshotDB).where(RunCaseSnapshotDB.id == new_cases[0].snapshot_id)
-        )
+        await db_session.execute(select(RunCaseSnapshotDB).where(RunCaseSnapshotDB.id == new_cases[0].snapshot_id))
     ).scalar_one()
     assert snap.snapshot_wombat_id == two_testcases[0].wombat_id
 
@@ -535,12 +507,11 @@ async def test_rerun_with_explicit_case_ids_overrides_status_filter(
     assert len(new_cases) == 1
 
     from sqlalchemy import select
+
     from wombat_api.database.models import RunCaseSnapshotDB
 
     snap = (
-        await db_session.execute(
-            select(RunCaseSnapshotDB).where(RunCaseSnapshotDB.id == new_cases[0].snapshot_id)
-        )
+        await db_session.execute(select(RunCaseSnapshotDB).where(RunCaseSnapshotDB.id == new_cases[0].snapshot_id))
     ).scalar_one()
     assert snap.snapshot_wombat_id == two_testcases[1].wombat_id
 

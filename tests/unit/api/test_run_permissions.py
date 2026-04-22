@@ -10,8 +10,7 @@ def test_viewer_has_runs_read_only():
 
 def test_editor_has_all_runs_perms_except_reopen():
     perms = role_permissions(Role.editor)
-    for p in (Permission.RUNS_READ, Permission.RUNS_CREATE,
-              Permission.RUNS_RECORD, Permission.RUNS_CLOSE):
+    for p in (Permission.RUNS_READ, Permission.RUNS_CREATE, Permission.RUNS_RECORD, Permission.RUNS_CLOSE):
         assert p in perms
     assert Permission.RUNS_REOPEN not in perms
 

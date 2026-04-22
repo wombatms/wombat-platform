@@ -58,11 +58,10 @@ from wombat_api.runs.schemas import (
     AssigneeRef,
     CloseRunRequest,
     CreateRunRequest,
-    EvidenceOut,
     EventOut,
+    EvidenceOut,
     PatchRunRequest,
     PutResultRequest,
-    RecordResultBatchResponseItem,
     RecordResultItem,
     RerunRequest,
     ResultOut,
@@ -89,8 +88,8 @@ async def _get_run_or_404(
     not in this project."""
     try:
         run_id = _uuid.UUID(run_id_str)
-    except ValueError:
-        raise RunNotFoundError()
+    except ValueError as exc:
+        raise RunNotFoundError() from exc
     run = await repo.get_run(run_id)
     if run is None or run.project_id != project_id:
         raise RunNotFoundError()
@@ -257,6 +256,7 @@ async def list_runs(
     next_cursor: str | None = None
     if len(runs) > limit:
         from wombat_api.database.repository import _encode_cursor
+
         next_cursor = _encode_cursor(runs[limit - 1].created_at)
         runs = runs[:limit]
 
@@ -333,13 +333,13 @@ async def patch_run(
         for a in existing:
             await repo.remove_assignee(a.id)
         # Add new ones
-        for uid in (body.assignee_user_ids or []):
+        for uid in body.assignee_user_ids or []:
             await repo.add_assignee(
                 run_id=run.id,
                 user_id=uid,
                 added_by_user_id=principal.user.id,
             )
-        for tid in (body.assignee_token_ids or []):
+        for tid in body.assignee_token_ids or []:
             await repo.add_assignee(
                 run_id=run.id,
                 token_id=tid,
@@ -389,12 +389,12 @@ async def add_cases(
 
     # Check for existing snapshots to detect duplicates
     from wombat_api.runs.service import _resolve_and_hash
+
     existing_pairs = await repo.list_run_cases_with_snapshots(run.id)
     existing_hashes: set[str] = {snap.content_hash for _rc, snap in existing_pairs}
 
     start_order = len(existing_pairs)
-    added_count = 0
-    for content in cases:
+    for added_count, content in enumerate(cases):
         resolved_body, content_hash = await _resolve_and_hash(content, session)
         if content_hash in existing_hashes:
             raise CaseAlreadyInRunError()
@@ -416,7 +416,6 @@ async def add_cases(
             actor_user_id=principal.user.id,
         )
         existing_hashes.add(content_hash)
-        added_count += 1
 
     await session.commit()
     await session.refresh(run)
@@ -456,8 +455,8 @@ async def remove_case(
 
     try:
         rc_id = _uuid.UUID(run_case_id)
-    except ValueError:
-        raise CaseNotInRunError()
+    except ValueError as exc:
+        raise CaseNotInRunError() from exc
 
     run_case = await session.get(RunCaseDB, rc_id)
     if run_case is None or run_case.run_id != run.id:
@@ -473,6 +472,7 @@ async def remove_case(
 
     # Get snapshot wombat_id before deletion for the event
     from wombat_api.database.models import RunCaseSnapshotDB
+
     snap = await session.get(RunCaseSnapshotDB, run_case.snapshot_id)
 
     await repo.remove_run_case(rc_id)
@@ -625,11 +625,15 @@ async def batch_record_results(
     )
 
     svc = RunService(session)
+    # Exactly one recorder must be set: prefer token when present (the token is
+    # the recording agent; the user is the token's owner, not the direct actor).
+    _actor_token_id = principal.token.id if principal.token else None
+    _actor_user_id = principal.user.id if _actor_token_id is None else None
     results = await svc.record_result_batch(
         run=run,
         items=body,
-        actor_user_id=principal.user.id,
-        actor_token_id=principal.token.id if principal.token else None,
+        actor_user_id=_actor_user_id,
+        actor_token_id=_actor_token_id,
         source=principal.kind,
     )
 
@@ -670,8 +674,11 @@ async def list_results(
             actor = ActorRef(principal_type="token", id=r.recorded_by_token_id)
 
         # Look up the run_case's wombat_id via snapshot
-        from wombat_api.database.models import RunCaseDB as _RunCaseDB, RunCaseSnapshotDB as _SnapDB
-        from sqlalchemy import select as _select, and_ as _and
+        from sqlalchemy import select as _select
+
+        from wombat_api.database.models import RunCaseDB as _RunCaseDB
+        from wombat_api.database.models import RunCaseSnapshotDB as _SnapDB
+
         stmt = (
             _select(_RunCaseDB, _SnapDB)
             .join(_SnapDB, _RunCaseDB.snapshot_id == _SnapDB.id)
@@ -742,17 +749,25 @@ async def put_result(
     if if_match is not None:
         try:
             expected_revision = int(if_match.strip('"'))
-        except ValueError:
-            raise HTTPException(status_code=400, detail={"code": "invalid_if_match", "message": "If-Match must be an integer revision."})
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "invalid_if_match",
+                    "message": "If-Match must be an integer revision.",
+                },
+            ) from exc
 
+    _r_token_id = principal.token.id if principal.token else None
+    _r_user_id = principal.user.id if _r_token_id is None else None
     try:
         result = await repo.upsert_result(
             run_id=run.id,
             run_case_id=run_case.id,
             status=body.status,
             source=principal.kind,
-            recorded_by_user_id=principal.user.id,
-            recorded_by_token_id=principal.token.id if principal.token else None,
+            recorded_by_user_id=_r_user_id,
+            recorded_by_token_id=_r_token_id,
             notes=body.notes,
             failed_at_step=body.failed_at_step,
             bug_links=[bl.model_dump() for bl in body.bug_links],
@@ -767,7 +782,7 @@ async def put_result(
                 "message": f"revision conflict; current={exc.current_revision}",
                 "current_revision": exc.current_revision,
             },
-        )
+        ) from exc
 
     event_type = "result_recorded" if result.revision == 1 else "result_updated"
     await repo.append_event(
@@ -930,14 +945,20 @@ async def upload_evidence(
         project_id=str(project.id),
     )
 
+    # Exactly one of user/token must be set (DB constraint).  When the caller
+    # authenticated via an API token, record the token as the uploader; the
+    # token's owning user is accessible via principal.user but should not be
+    # double-recorded here.
+    _ev_user_id = principal.user.id if principal.token is None else None
+    _ev_token_id = principal.token.id if principal.token is not None else None
     evidence_row = await repo.add_evidence(
         result_id=result.id,
         blob_id=blob_id,
         filename=filename,
         mime_type=mime_type,
         size_bytes=total,
-        uploaded_by_user_id=principal.user.id,
-        uploaded_by_token_id=principal.token.id if principal.token else None,
+        uploaded_by_user_id=_ev_user_id,
+        uploaded_by_token_id=_ev_token_id,
     )
 
     await repo.append_event(
@@ -951,7 +972,10 @@ async def upload_evidence(
     await session.commit()
     await session.refresh(evidence_row)
 
-    actor_ref = ActorRef(principal_type="user", id=principal.user.id)
+    if principal.token is not None:
+        actor_ref = ActorRef(principal_type="token", id=principal.token.id)
+    else:
+        actor_ref = ActorRef(principal_type="user", id=principal.user.id)
     return {
         "data": EvidenceOut(
             id=evidence_row.id,
@@ -1000,8 +1024,8 @@ async def delete_evidence(
 
     try:
         eid = _uuid.UUID(evidence_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail={"code": "evidence_not_found"})
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail={"code": "evidence_not_found"}) from exc
 
     evidence_row = await repo.get_evidence(eid)
     if evidence_row is None:

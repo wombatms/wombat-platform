@@ -194,8 +194,7 @@ _TOOLS: list[types.Tool] = [
     types.Tool(
         name="create_run",
         description=(
-            "Create a new test run for a project. "
-            "Provide exactly one of case_ids or filter in case_selection."
+            "Create a new test run for a project. Provide exactly one of case_ids or filter in case_selection."
         ),
         inputSchema={
             "type": "object",
@@ -209,8 +208,7 @@ _TOOLS: list[types.Tool] = [
                 "case_selection": {
                     "type": "object",
                     "description": (
-                        "Exactly one of 'case_ids' (list of wombat_ids) or "
-                        "'filter' (dict of filter params)."
+                        "Exactly one of 'case_ids' (list of wombat_ids) or 'filter' (dict of filter params)."
                     ),
                     "properties": {
                         "case_ids": {

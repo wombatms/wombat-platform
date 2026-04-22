@@ -15,11 +15,9 @@ from __future__ import annotations
 
 import uuid
 
-import pytest
 from httpx import AsyncClient
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -63,7 +61,6 @@ async def _update_testcase_body(
     new_markdown: str,
 ) -> None:
     """Update the markdown in an existing testcase body in-place."""
-    from sqlalchemy import update
     from wombat_api.database.models import Content
 
     existing_q = select(Content).where(
@@ -341,14 +338,10 @@ async def test_shared_step_inlined_and_frozen(
     hash_run2 = await _snapshot_hash_for_run(db_session, run2_id)
 
     # Run 1's snapshot hash must be unchanged (frozen).
-    assert hash_run1_after == hash_before_edit, (
-        "Run 1 snapshot must remain frozen after shared_step edit"
-    )
+    assert hash_run1_after == hash_before_edit, "Run 1 snapshot must remain frozen after shared_step edit"
 
     # Run 2 must get a new snapshot (because the shared step body changed).
-    assert hash_run2 != hash_before_edit, (
-        "Run 2 must capture the edited shared_step content → different hash"
-    )
+    assert hash_run2 != hash_before_edit, "Run 2 must capture the edited shared_step content → different hash"
 
     # Confirm run 1's inlined body still contains the OLD step text.
     old_snap_row = (await db_session.execute(snap_q)).scalar_one()

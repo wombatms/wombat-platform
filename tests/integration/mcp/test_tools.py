@@ -313,11 +313,7 @@ async def test_get_run_not_found():
 # record_result
 # ---------------------------------------------------------------------------
 
-_BATCH_RESPONSE = {
-    "results": [
-        {"case_id": _CASE_ID, "ok": True, "revision": 1, "error": None}
-    ]
-}
+_BATCH_RESPONSE = {"results": [{"case_id": _CASE_ID, "ok": True, "revision": 1, "error": None}]}
 
 
 @respx.mock
@@ -326,9 +322,9 @@ async def test_record_result_single_dict():
     """record_result wraps a single dict into a list and POSTs it."""
     from wombat_mcp.tools.api import _sp33_record_result
 
-    route = respx.post(
-        f"{_BASE_URL}/api/projects/{_PROJECT}/runs/{_RUN_ID}/results"
-    ).mock(return_value=httpx.Response(200, json=_BATCH_RESPONSE))
+    route = respx.post(f"{_BASE_URL}/api/projects/{_PROJECT}/runs/{_RUN_ID}/results").mock(
+        return_value=httpx.Response(200, json=_BATCH_RESPONSE)
+    )
 
     result = await _sp33_record_result(
         {
@@ -360,9 +356,9 @@ async def test_record_result_batch_list():
             {"case_id": "TC-002", "ok": True, "revision": 1, "error": None},
         ]
     }
-    route = respx.post(
-        f"{_BASE_URL}/api/projects/{_PROJECT}/runs/{_RUN_ID}/results"
-    ).mock(return_value=httpx.Response(200, json=batch_response))
+    route = respx.post(f"{_BASE_URL}/api/projects/{_PROJECT}/runs/{_RUN_ID}/results").mock(
+        return_value=httpx.Response(200, json=batch_response)
+    )
 
     result = await _sp33_record_result(
         {
@@ -388,12 +384,8 @@ async def test_record_result_run_closed_error():
     """record_result surfaces the run_closed error from the server."""
     from wombat_mcp.tools.api import _sp33_record_result
 
-    respx.post(
-        f"{_BASE_URL}/api/projects/{_PROJECT}/runs/{_RUN_ID}/results"
-    ).mock(
-        return_value=httpx.Response(
-            403, json={"error": {"code": "run_closed", "message": "Run is closed."}}
-        )
+    respx.post(f"{_BASE_URL}/api/projects/{_PROJECT}/runs/{_RUN_ID}/results").mock(
+        return_value=httpx.Response(403, json={"error": {"code": "run_closed", "message": "Run is closed."}})
     )
 
     with pytest.raises(httpx.HTTPStatusError):
@@ -568,9 +560,9 @@ async def test_close_run_happy_path():
     """close_run POSTs to /close with reason and optional note."""
     from wombat_mcp.tools.api import _sp33_close_run
 
-    route = respx.post(
-        f"{_BASE_URL}/api/projects/{_PROJECT}/runs/{_RUN_ID}/close"
-    ).mock(return_value=httpx.Response(200, json=_CLOSED_RUN_DETAIL))
+    route = respx.post(f"{_BASE_URL}/api/projects/{_PROJECT}/runs/{_RUN_ID}/close").mock(
+        return_value=httpx.Response(200, json=_CLOSED_RUN_DETAIL)
+    )
 
     result = await _sp33_close_run(
         {
@@ -595,9 +587,9 @@ async def test_close_run_without_note():
     """close_run works without a note."""
     from wombat_mcp.tools.api import _sp33_close_run
 
-    route = respx.post(
-        f"{_BASE_URL}/api/projects/{_PROJECT}/runs/{_RUN_ID}/close"
-    ).mock(return_value=httpx.Response(200, json=_CLOSED_RUN_DETAIL))
+    route = respx.post(f"{_BASE_URL}/api/projects/{_PROJECT}/runs/{_RUN_ID}/close").mock(
+        return_value=httpx.Response(200, json=_CLOSED_RUN_DETAIL)
+    )
 
     await _sp33_close_run(
         {
@@ -618,9 +610,7 @@ async def test_close_run_already_closed_error():
     """close_run surfaces the run_closed error from the server (already closed)."""
     from wombat_mcp.tools.api import _sp33_close_run
 
-    respx.post(
-        f"{_BASE_URL}/api/projects/{_PROJECT}/runs/{_RUN_ID}/close"
-    ).mock(
+    respx.post(f"{_BASE_URL}/api/projects/{_PROJECT}/runs/{_RUN_ID}/close").mock(
         return_value=httpx.Response(
             409,
             json={"error": {"code": "run_closed", "message": "Run is already closed."}},
@@ -652,9 +642,7 @@ async def test_registry_dispatches_create_run():
 
     registry = build_tool_registry("api")
 
-    respx.post(f"{_BASE_URL}/api/projects/{_PROJECT}/runs").mock(
-        return_value=httpx.Response(201, json=_RUN_DETAIL)
-    )
+    respx.post(f"{_BASE_URL}/api/projects/{_PROJECT}/runs").mock(return_value=httpx.Response(201, json=_RUN_DETAIL))
 
     result = await registry.call(
         "create_run",
@@ -677,9 +665,9 @@ async def test_registry_dispatches_record_result():
 
     registry = build_tool_registry("api")
 
-    respx.post(
-        f"{_BASE_URL}/api/projects/{_PROJECT}/runs/{_RUN_ID}/results"
-    ).mock(return_value=httpx.Response(200, json=_BATCH_RESPONSE))
+    respx.post(f"{_BASE_URL}/api/projects/{_PROJECT}/runs/{_RUN_ID}/results").mock(
+        return_value=httpx.Response(200, json=_BATCH_RESPONSE)
+    )
 
     result = await registry.call(
         "record_result",
@@ -701,9 +689,9 @@ async def test_registry_dispatches_close_run():
 
     registry = build_tool_registry("api")
 
-    respx.post(
-        f"{_BASE_URL}/api/projects/{_PROJECT}/runs/{_RUN_ID}/close"
-    ).mock(return_value=httpx.Response(200, json=_CLOSED_RUN_DETAIL))
+    respx.post(f"{_BASE_URL}/api/projects/{_PROJECT}/runs/{_RUN_ID}/close").mock(
+        return_value=httpx.Response(200, json=_CLOSED_RUN_DETAIL)
+    )
 
     result = await registry.call(
         "close_run",
@@ -726,7 +714,7 @@ async def test_registry_dispatches_close_run():
 # ---------------------------------------------------------------------------
 
 
-def _make_call_tool_request(name: str, arguments: dict) -> mcp.types.CallToolRequest:
+def _make_call_tool_request(name: str, arguments: dict):  # -> mcp.types.CallToolRequest
     import mcp.types as t  # local import keeps top-level namespace clean
 
     return t.CallToolRequest(params=t.CallToolRequestParams(name=name, arguments=arguments))

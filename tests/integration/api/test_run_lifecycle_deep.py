@@ -18,7 +18,6 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -64,10 +63,7 @@ async def _create_run(
     case_ids: list[str] | None = None,
 ) -> str:
     """POST /api/projects/{slug}/runs and return the run id."""
-    if case_ids:
-        selection = {"case_ids": case_ids}
-    else:
-        selection = {"filter": {"q": "__no_match_empty_run__"}}
+    selection = {"case_ids": case_ids} if case_ids else {"filter": {"q": "__no_match_empty_run__"}}
     r = await client.post(
         f"/api/projects/{slug}/runs",
         json={"title": title, "case_selection": selection},
@@ -174,7 +170,7 @@ async def _make_closed_run_with_mixed_results(
 
     # Record mixed results: pass, fail, blocked, pass
     statuses = ["pass", "fail", "blocked", "pass"]
-    items = [{"case_id": cid, "status": st} for cid, st in zip(case_ids, statuses)]
+    items = [{"case_id": cid, "status": st} for cid, st in zip(case_ids, statuses, strict=False)]
     await _record_results(httpx_client, slug, run_id, editor_token, items)
 
     await _close_run(httpx_client, slug, run_id, admin_token, reason="completed")
@@ -209,21 +205,20 @@ async def test_started_at_null_until_first_result(
 
     # Immediately after creation: started_at must be null
     run_data = await _get_run(httpx_client, slug, run_id, admin_token)
-    assert run_data["started_at"] is None, (
-        f"Expected started_at=null after creation, got {run_data['started_at']!r}"
-    )
+    assert run_data["started_at"] is None, f"Expected started_at=null after creation, got {run_data['started_at']!r}"
 
     # Record first result
     await _record_results(
-        httpx_client, slug, run_id, editor_token,
+        httpx_client,
+        slug,
+        run_id,
+        editor_token,
         [{"case_id": wid, "status": "pass"}],
     )
 
     # Now started_at must be set
     run_data = await _get_run(httpx_client, slug, run_id, admin_token)
-    assert run_data["started_at"] is not None, (
-        "Expected started_at to be populated after first result"
-    )
+    assert run_data["started_at"] is not None, "Expected started_at to be populated after first result"
 
 
 # ---------------------------------------------------------------------------
@@ -337,7 +332,10 @@ async def test_reopen_clears_closed_at_and_allows_writes(
 
     # Subsequent write should succeed
     results = await _record_results(
-        httpx_client, slug, run_id, editor_token,
+        httpx_client,
+        slug,
+        run_id,
+        editor_token,
         [{"case_id": wid, "status": "pass"}],
     )
     assert results[0]["ok"] is True, f"Expected result write to succeed after reopen: {results[0]}"
@@ -385,9 +383,7 @@ async def test_rerun_failed_from_closed_parent(
     )
 
     # Assert the title includes "Rerun" (as per service implementation)
-    assert "Rerun" in new_run_data["title"], (
-        f"Expected 'Rerun' in title, got {new_run_data['title']!r}"
-    )
+    assert "Rerun" in new_run_data["title"], f"Expected 'Rerun' in title, got {new_run_data['title']!r}"
 
     # Assert only the fail/blocked cases are in the new run
     assert new_run_data["counts"]["total"] == 2, (
@@ -396,10 +392,11 @@ async def test_rerun_failed_from_closed_parent(
 
     # Inspect snapshot content_hashes: fetch snapshots from the new run and the parent
     # and verify they share the same hashes for the re-run cases
-    from wombat_api.database.models import RunCaseDB, RunCaseSnapshotDB
     from sqlalchemy import select
-    import wombat_api.database.engine as _engine_mod
     from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    import wombat_api.database.engine as _engine_mod
+    from wombat_api.database.models import RunCaseDB, RunCaseSnapshotDB
 
     factory = async_sessionmaker(_engine_mod.engine, expire_on_commit=False)
     async with factory() as s:
@@ -411,9 +408,7 @@ async def test_rerun_failed_from_closed_parent(
             .where(RunCaseDB.run_id == new_run_uuid)
         )
         new_pairs = (await s.execute(stmt)).all()
-        new_hashes: dict[str, str] = {
-            snap.snapshot_wombat_id: snap.content_hash for _rc, snap in new_pairs
-        }
+        new_hashes: dict[str, str] = {snap.snapshot_wombat_id: snap.content_hash for _rc, snap in new_pairs}
         new_wombat_ids = set(new_hashes.keys())
 
         # Parent run's snapshots
@@ -424,9 +419,7 @@ async def test_rerun_failed_from_closed_parent(
             .where(RunCaseDB.run_id == parent_run_uuid)
         )
         parent_pairs = (await s.execute(stmt2)).all()
-        parent_hashes: dict[str, str] = {
-            snap.snapshot_wombat_id: snap.content_hash for _rc, snap in parent_pairs
-        }
+        parent_hashes: dict[str, str] = {snap.snapshot_wombat_id: snap.content_hash for _rc, snap in parent_pairs}
 
     # Check that exactly the expected wombat_ids are in the new run
     assert new_wombat_ids == expected_rerun_ids, (
@@ -437,8 +430,7 @@ async def test_rerun_failed_from_closed_parent(
     for wid in expected_rerun_ids:
         assert wid in parent_hashes, f"Expected {wid!r} in parent snapshots"
         assert new_hashes[wid] == parent_hashes[wid], (
-            f"Snapshot hash mismatch for {wid!r}: "
-            f"parent={parent_hashes[wid]!r}, rerun={new_hashes[wid]!r}"
+            f"Snapshot hash mismatch for {wid!r}: parent={parent_hashes[wid]!r}, rerun={new_hashes[wid]!r}"
         )
 
 
@@ -483,10 +475,11 @@ async def test_rerun_explicit_case_ids_overrides_status_filter(
     assert new_run_data["parent_run_id"] == parent_run_id
 
     # Confirm the new run's snapshot wombat_ids match our explicit list
-    from wombat_api.database.models import RunCaseDB, RunCaseSnapshotDB
     from sqlalchemy import select
-    import wombat_api.database.engine as _engine_mod
     from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    import wombat_api.database.engine as _engine_mod
+    from wombat_api.database.models import RunCaseDB, RunCaseSnapshotDB
 
     factory = async_sessionmaker(_engine_mod.engine, expire_on_commit=False)
     async with factory() as s:
@@ -499,9 +492,7 @@ async def test_rerun_explicit_case_ids_overrides_status_filter(
         pairs = (await s.execute(stmt)).all()
         new_wombat_ids = {snap.snapshot_wombat_id for _rc, snap in pairs}
 
-    assert new_wombat_ids == set(explicit_ids), (
-        f"Expected new run wombat_ids={set(explicit_ids)}, got {new_wombat_ids}"
-    )
+    assert new_wombat_ids == set(explicit_ids), f"Expected new run wombat_ids={set(explicit_ids)}, got {new_wombat_ids}"
 
 
 # ---------------------------------------------------------------------------
@@ -532,21 +523,15 @@ async def test_abort_records_run_aborted_event(
     abort_data = await _close_run(httpx_client, slug, run_id, admin_token, reason="aborted", note="Infra failure")
 
     # Status should be 'aborted'
-    assert abort_data["status"] == "aborted", (
-        f"Expected status='aborted', got {abort_data['status']!r}"
-    )
+    assert abort_data["status"] == "aborted", f"Expected status='aborted', got {abort_data['status']!r}"
     assert abort_data["closed_at"] is not None, "Expected closed_at to be set after abort"
     assert abort_data["closure_note"] == "Infra failure"
 
     # Should have run_aborted event, NOT run_closed
     events = await _get_events(httpx_client, slug, run_id, admin_token)
     event_types = [e["event_type"] for e in events]
-    assert "run_aborted" in event_types, (
-        f"Expected 'run_aborted' in events: {event_types}"
-    )
-    assert "run_closed" not in event_types, (
-        f"Did not expect 'run_closed' for aborted run, but found it: {event_types}"
-    )
+    assert "run_aborted" in event_types, f"Expected 'run_aborted' in events: {event_types}"
+    assert "run_closed" not in event_types, f"Did not expect 'run_closed' for aborted run, but found it: {event_types}"
 
     # Subsequent writes are also blocked (aborted = closed)
     r = await httpx_client.post(
@@ -554,6 +539,4 @@ async def test_abort_records_run_aborted_event(
         json=[{"case_id": wid, "status": "pass"}],
         headers={"Authorization": f"Bearer {editor_token}"},
     )
-    assert r.status_code == 403, (
-        f"Expected 403 on aborted run write, got {r.status_code}: {r.text}"
-    )
+    assert r.status_code == 403, f"Expected 403 on aborted run write, got {r.status_code}: {r.text}"

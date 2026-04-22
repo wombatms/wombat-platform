@@ -214,11 +214,11 @@ async def test_non_member_cannot_issue_token(
     db_session,
 ):
     """A user with no role on the project receives 403."""
+    import uuid
+
     from wombat_api.auth.jwt import create_access_token
     from wombat_api.auth.passwords import hash_password
     from wombat_api.database.models import ProjectDB, UserDB
-
-    import uuid
 
     # Create a separate project that the `users` fixture users don't belong to.
     orphan_project = ProjectDB(

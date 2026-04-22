@@ -21,13 +21,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from wombat_api.database.models import Content, RunCaseDB, RunDB
 from wombat_api.database.repository import Repository
-from wombat_api.runs.exceptions import RunClosedError, RunNotOpenError, ResultConflictError
+from wombat_api.runs.exceptions import ResultConflictError, RunClosedError, RunNotOpenError
 from wombat_api.runs.schemas import (
     CaseSelection,
     RecordResultBatchResponseItem,
     RecordResultItem,
 )
-
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -340,9 +339,7 @@ class RunService:
 
         # Stamp started_at if this is the first result batch.
         await self.session.execute(
-            update(RunDB)
-            .where(RunDB.id == run.id, RunDB.started_at.is_(None))
-            .values(started_at=func.now())
+            update(RunDB).where(RunDB.id == run.id, RunDB.started_at.is_(None)).values(started_at=func.now())
         )
 
         return out
@@ -445,14 +442,10 @@ class RunService:
         else:
             # Get parent results and filter by status.
             results = await repo.list_results(run_id=parent_run.id)
-            result_by_case_id: dict[uuid.UUID, str] = {
-                r.run_case_id: r.status for r in results
-            }
+            result_by_case_id: dict[uuid.UUID, str] = {r.run_case_id: r.status for r in results}
             pairs = await repo.list_run_cases_with_snapshots(parent_run.id)
             selected_ids = [
-                snap.snapshot_wombat_id
-                for rc, snap in pairs
-                if result_by_case_id.get(rc.id) in include_statuses
+                snap.snapshot_wombat_id for rc, snap in pairs if result_by_case_id.get(rc.id) in include_statuses
             ]
 
         # Use case_ids if we have any; otherwise use a "no results" filter
@@ -460,12 +453,9 @@ class RunService:
         # route through the filter path with a highly-restrictive q that
         # returns no rows — keeping a consistent code path while still
         # allowing empty reruns).
-        if selected_ids:
-            selection = CaseSelection(case_ids=selected_ids)
-        else:
-            # Produce an empty run: use filter with a sentinel that matches nothing.
-            # Alternatively, we bypass create_run entirely for the zero-case path.
-            selection = None  # handled below
+        # Produce an empty run: use filter with a sentinel that matches nothing.
+        # Alternatively, we bypass create_run entirely for the zero-case path.
+        selection = CaseSelection(case_ids=selected_ids) if selected_ids else None  # handled below
 
         repo = Repository(self.session)
 

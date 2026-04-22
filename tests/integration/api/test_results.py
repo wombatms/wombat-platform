@@ -7,8 +7,6 @@ from __future__ import annotations
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
-
 
 # ---------------------------------------------------------------------------
 # Task 20: POST /projects/{slug}/runs/{id}/results (batch)

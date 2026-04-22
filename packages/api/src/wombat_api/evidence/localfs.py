@@ -44,9 +44,7 @@ class LocalFSBackend:
     ) -> str:
         """Write *data* to disk; return ``blob_id``."""
         body = await asyncio.to_thread(data.read)
-        blob_id = await asyncio.to_thread(
-            self._write_bytes, body, filename, project_id
-        )
+        blob_id = await asyncio.to_thread(self._write_bytes, body, filename, project_id)
         return blob_id
 
     async def get_url(self, blob_id: str, expires_in: int = 300) -> str:

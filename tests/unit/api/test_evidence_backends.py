@@ -49,6 +49,7 @@ def make_s3_backend() -> S3Backend:
 # rather than a plain backend instance.
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(params=["localfs", "s3"])
 async def evidence_backend(request, tmp_path):
     """Yields an EvidenceBackend instance (LocalFS or moto-S3)."""
@@ -66,6 +67,7 @@ async def evidence_backend(request, tmp_path):
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_put_returns_stable_blob_id(evidence_backend):
@@ -88,12 +90,16 @@ async def test_put_deduplicates_identical_content(evidence_backend):
     """Uploading identical bytes twice yields the same blob_id."""
     body = b"same content"
     b1 = await evidence_backend.put(
-        data=BytesIO(body), mime_type="text/plain",
-        filename="dup.txt", project_id="proj-1",
+        data=BytesIO(body),
+        mime_type="text/plain",
+        filename="dup.txt",
+        project_id="proj-1",
     )
     b2 = await evidence_backend.put(
-        data=BytesIO(body), mime_type="text/plain",
-        filename="dup.txt", project_id="proj-1",
+        data=BytesIO(body),
+        mime_type="text/plain",
+        filename="dup.txt",
+        project_id="proj-1",
     )
     assert b1 == b2
 
@@ -168,14 +174,17 @@ async def test_delete_nonexistent_is_idempotent(evidence_backend):
 # LocalFS-specific tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_localfs_file_written_at_expected_path(tmp_path):
     backend = LocalFSBackend(root=tmp_path, signing_key="k" * 32)
     body = b"specific content"
     sha = hashlib.sha256(body).hexdigest()
     blob_id = await backend.put(
-        data=BytesIO(body), mime_type="text/plain",
-        filename="spec.txt", project_id="myproj",
+        data=BytesIO(body),
+        mime_type="text/plain",
+        filename="spec.txt",
+        project_id="myproj",
     )
     expected_path = tmp_path / "myproj" / f"{sha}.txt"
     assert expected_path.exists()
@@ -187,8 +196,10 @@ async def test_localfs_file_written_at_expected_path(tmp_path):
 async def test_localfs_signed_url_contains_sig_and_exp(tmp_path):
     backend = LocalFSBackend(root=tmp_path, signing_key="s" * 32)
     blob_id = await backend.put(
-        data=BytesIO(b"y"), mime_type="text/plain",
-        filename="y.txt", project_id="proj",
+        data=BytesIO(b"y"),
+        mime_type="text/plain",
+        filename="y.txt",
+        project_id="proj",
     )
     url = await backend.get_url(blob_id, expires_in=300)
     assert "sig=" in url
@@ -201,8 +212,10 @@ async def test_localfs_no_signing_key_still_works(tmp_path):
     """LocalFSBackend with no signing_key does not crash."""
     backend = LocalFSBackend(root=tmp_path, signing_key=None)
     blob_id = await backend.put(
-        data=BytesIO(b"nosig"), mime_type="text/plain",
-        filename="nosig.txt", project_id="p",
+        data=BytesIO(b"nosig"),
+        mime_type="text/plain",
+        filename="nosig.txt",
+        project_id="p",
     )
     url = await backend.get_url(blob_id)
     assert url
@@ -212,14 +225,17 @@ async def test_localfs_no_signing_key_still_works(tmp_path):
 # Protocol conformance check
 # ---------------------------------------------------------------------------
 
+
 def test_localfs_satisfies_protocol(tmp_path):
     from wombat_api.evidence.backend import EvidenceBackend
+
     backend = LocalFSBackend(root=tmp_path, signing_key="x" * 32)
     assert isinstance(backend, EvidenceBackend)
 
 
 def test_s3_satisfies_protocol():
     from wombat_api.evidence.backend import EvidenceBackend
+
     backend = S3Backend(bucket="b", region="us-east-1")
     assert isinstance(backend, EvidenceBackend)
 
@@ -228,9 +244,11 @@ def test_s3_satisfies_protocol():
 # Factory smoke test
 # ---------------------------------------------------------------------------
 
+
 def test_make_evidence_backend_localfs(tmp_path):
     from wombat_api.config import EvidenceConfig
     from wombat_api.evidence.backend import make_evidence_backend
+
     cfg = EvidenceConfig(backend="localfs", root=tmp_path, signing_key="key")
     backend = make_evidence_backend(cfg)
     assert isinstance(backend, LocalFSBackend)
@@ -239,6 +257,7 @@ def test_make_evidence_backend_localfs(tmp_path):
 def test_make_evidence_backend_s3():
     from wombat_api.config import EvidenceConfig
     from wombat_api.evidence.backend import make_evidence_backend
+
     cfg = EvidenceConfig(backend="s3", bucket="my-bucket", region="us-east-1")
     backend = make_evidence_backend(cfg)
     assert isinstance(backend, S3Backend)
@@ -247,6 +266,7 @@ def test_make_evidence_backend_s3():
 def test_make_evidence_backend_unknown_raises():
     from wombat_api.config import EvidenceConfig
     from wombat_api.evidence.backend import make_evidence_backend
+
     cfg = EvidenceConfig(backend="localfs")  # type: ignore[arg-type]
     # Monkey-patch to trigger the unknown branch
     object.__setattr__(cfg, "backend", "gcs")

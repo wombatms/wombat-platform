@@ -114,7 +114,7 @@ def upgrade() -> None:
             "(user_id IS NOT NULL)::int + (token_id IS NOT NULL)::int = 1"
             if is_pg
             else "(CASE WHEN user_id IS NOT NULL THEN 1 ELSE 0 END) + "
-                 "(CASE WHEN token_id IS NOT NULL THEN 1 ELSE 0 END) = 1",
+            "(CASE WHEN token_id IS NOT NULL THEN 1 ELSE 0 END) = 1",
             name="ck_run_assignee_exactly_one_principal",
         ),
     )
@@ -236,11 +236,10 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.CheckConstraint(
-            "(recorded_by_user_id IS NOT NULL)::int "
-            "+ (recorded_by_token_id IS NOT NULL)::int = 1"
+            "(recorded_by_user_id IS NOT NULL)::int + (recorded_by_token_id IS NOT NULL)::int = 1"
             if is_pg
             else "(CASE WHEN recorded_by_user_id IS NOT NULL THEN 1 ELSE 0 END) + "
-                 "(CASE WHEN recorded_by_token_id IS NOT NULL THEN 1 ELSE 0 END) = 1",
+            "(CASE WHEN recorded_by_token_id IS NOT NULL THEN 1 ELSE 0 END) = 1",
             name="ck_result_exactly_one_recorder",
         ),
         sa.UniqueConstraint("run_id", "run_case_id", name="ux_result_unique_case"),
@@ -280,11 +279,10 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.CheckConstraint(
-            "(uploaded_by_user_id IS NOT NULL)::int "
-            "+ (uploaded_by_token_id IS NOT NULL)::int = 1"
+            "(uploaded_by_user_id IS NOT NULL)::int + (uploaded_by_token_id IS NOT NULL)::int = 1"
             if is_pg
             else "(CASE WHEN uploaded_by_user_id IS NOT NULL THEN 1 ELSE 0 END) + "
-                 "(CASE WHEN uploaded_by_token_id IS NOT NULL THEN 1 ELSE 0 END) = 1",
+            "(CASE WHEN uploaded_by_token_id IS NOT NULL THEN 1 ELSE 0 END) = 1",
             name="ck_evidence_exactly_one_uploader",
         ),
     )

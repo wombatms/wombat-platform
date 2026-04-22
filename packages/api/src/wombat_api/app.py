@@ -132,9 +132,7 @@ def _register_routes(app: FastAPI) -> None:
         app.include_router(runs_routes.router, tags=["runs"])
         app.include_router(evidence_routes.router, tags=["evidence"])
     except ImportError:
-        logger.debug(
-            "SP3.3 runs/evidence routes not yet available — skipping registration."
-        )
+        logger.debug("SP3.3 runs/evidence routes not yet available — skipping registration.")
 
 
 def _register_error_handlers(app: FastAPI) -> None:

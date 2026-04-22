@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -29,11 +30,24 @@ class Principal:
 
     def permissions(self, role: Role) -> frozenset[Permission]:
         base = set(role_permissions(role))
-        if self.token is not None and self.token.publish_direct:
-            base.add(Permission.CONTENT_PUBLISH_DIRECT)
         # NOTE: per-user additive grants (editor with explicit publish_direct) live
         # in a future user_permission_grants table. Out of scope for SP3.2 code;
         # admin-grantable-per-user surface is covered by the admin role for MVP.
+        # SP3.3: if the token has an explicit permissions list, intersect it with
+        # the role-default set so that a narrowly-scoped CI token (e.g.
+        # permissions=["runs:record"]) cannot use permissions it was not granted.
+        if self.token is not None and self.token.permissions is not None:
+            token_perms: set[Permission] = set()
+            for p_str in self.token.permissions:
+                with contextlib.suppress(ValueError):
+                    token_perms.add(Permission(p_str))
+            base = base & token_perms
+        # publish_direct is an explicit grant that lives outside the normal
+        # permission enumeration; re-add it *after* the intersection so a
+        # narrowly-scoped token that doesn't list it can still use the grant
+        # when the token row itself carries publish_direct=True.
+        if self.token is not None and self.token.publish_direct:
+            base.add(Permission.CONTENT_PUBLISH_DIRECT)
         return frozenset(base)
 
 

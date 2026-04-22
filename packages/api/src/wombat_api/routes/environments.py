@@ -78,7 +78,7 @@ async def create_environment(
         )
         await session.commit()
         await session.refresh(env)
-    except IntegrityError:
+    except IntegrityError as exc:
         await session.rollback()
         raise HTTPException(
             status_code=409,
@@ -88,7 +88,7 @@ async def create_environment(
                 "field": "name",
                 "hint": None,
             },
-        )
+        ) from exc
     return {"data": _env_out(env)}
 
 
@@ -112,8 +112,8 @@ async def delete_environment(
     repo = Repository(session)
     try:
         parsed_id = _uuid.UUID(env_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Environment not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Environment not found") from exc
 
     await repo.delete_environment(parsed_id)
     await session.commit()

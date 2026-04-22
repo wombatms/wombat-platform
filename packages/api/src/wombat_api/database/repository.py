@@ -147,9 +147,7 @@ class Repository:
         )
         return [(slug, role) for slug, role in (await self.session.execute(q)).all()]
 
-    async def ensure_default_environment(
-        self, *, project_id: uuid.UUID, user_id: uuid.UUID
-    ) -> EnvironmentDB:
+    async def ensure_default_environment(self, *, project_id: uuid.UUID, user_id: uuid.UUID) -> EnvironmentDB:
         """Idempotent. Creates a 'default' environment if missing; returns the row."""
         existing = await self.session.execute(
             select(EnvironmentDB).where(
@@ -856,15 +854,11 @@ class Repository:
 
     async def list_environments(self, project_id: uuid.UUID) -> list[EnvironmentDB]:
         result = await self.session.execute(
-            select(EnvironmentDB)
-            .where(EnvironmentDB.project_id == project_id)
-            .order_by(EnvironmentDB.name)
+            select(EnvironmentDB).where(EnvironmentDB.project_id == project_id).order_by(EnvironmentDB.name)
         )
         return list(result.scalars().all())
 
-    async def create_environment(
-        self, *, project_id: uuid.UUID, name: str, user_id: uuid.UUID
-    ) -> EnvironmentDB:
+    async def create_environment(self, *, project_id: uuid.UUID, name: str, user_id: uuid.UUID) -> EnvironmentDB:
         row = EnvironmentDB(
             project_id=project_id,
             name=name,
@@ -898,9 +892,7 @@ class Repository:
         never to the live Content row.
         """
         existing = await self.session.execute(
-            select(RunCaseSnapshotDB).where(
-                RunCaseSnapshotDB.content_hash == content_hash
-            )
+            select(RunCaseSnapshotDB).where(RunCaseSnapshotDB.content_hash == content_hash)
         )
         row = existing.scalar_one_or_none()
         if row is not None:
@@ -920,9 +912,7 @@ class Repository:
             await self.session.rollback()
             return (
                 await self.session.execute(
-                    select(RunCaseSnapshotDB).where(
-                        RunCaseSnapshotDB.content_hash == content_hash
-                    )
+                    select(RunCaseSnapshotDB).where(RunCaseSnapshotDB.content_hash == content_hash)
                 )
             ).scalar_one()
         return row
@@ -1010,9 +1000,7 @@ class Repository:
 
     async def list_assignees(self, run_id: uuid.UUID) -> list[RunAssigneeDB]:
         result = await self.session.execute(
-            select(RunAssigneeDB)
-            .where(RunAssigneeDB.run_id == run_id)
-            .order_by(RunAssigneeDB.added_at.asc())
+            select(RunAssigneeDB).where(RunAssigneeDB.run_id == run_id).order_by(RunAssigneeDB.added_at.asc())
         )
         return list(result.scalars())
 
@@ -1048,20 +1036,27 @@ class Repository:
         user_id: uuid.UUID | None = None,
         token_id: uuid.UUID | None = None,
     ) -> bool:
-        """Return True if the (user_id | token_id) is owner or assignee of this run."""
+        """Return True if the (user_id | token_id) is owner or assignee of this run.
+
+        When both user_id and token_id are provided (API-token authentication),
+        the assignee check tests EITHER the user-type OR the token-type entry so
+        that a token explicitly added as an assignee is correctly recognised even
+        though its owner user_id is also non-None.
+        """
         run = await self.session.get(RunDB, run_id)
         if run is None:
             return False
         if user_id is not None and run.owner_id == user_id:
             return True
-        conds = [RunAssigneeDB.run_id == run_id]
-        if user_id is not None:
-            conds.append(RunAssigneeDB.user_id == user_id)
-        elif token_id is not None:
-            conds.append(RunAssigneeDB.token_id == token_id)
-        else:
+        if user_id is None and token_id is None:
             return False
-        q = select(func.count()).select_from(RunAssigneeDB).where(and_(*conds))
+        # Build an OR clause: a user-assignee row OR a token-assignee row.
+        or_parts = []
+        if user_id is not None:
+            or_parts.append(and_(RunAssigneeDB.run_id == run_id, RunAssigneeDB.user_id == user_id))
+        if token_id is not None:
+            or_parts.append(and_(RunAssigneeDB.run_id == run_id, RunAssigneeDB.token_id == token_id))
+        q = select(func.count()).select_from(RunAssigneeDB).where(or_(*or_parts))
         count = (await self.session.execute(q)).scalar_one()
         return count > 0
 
@@ -1087,15 +1082,11 @@ class Repository:
 
     async def list_run_cases(self, run_id: uuid.UUID) -> list[RunCaseDB]:
         result = await self.session.execute(
-            select(RunCaseDB)
-            .where(RunCaseDB.run_id == run_id)
-            .order_by(RunCaseDB.display_order.asc())
+            select(RunCaseDB).where(RunCaseDB.run_id == run_id).order_by(RunCaseDB.display_order.asc())
         )
         return list(result.scalars())
 
-    async def list_run_cases_with_snapshots(
-        self, run_id: uuid.UUID
-    ) -> list[tuple[RunCaseDB, RunCaseSnapshotDB]]:
+    async def list_run_cases_with_snapshots(self, run_id: uuid.UUID) -> list[tuple[RunCaseDB, RunCaseSnapshotDB]]:
         """Return (run_case, snapshot) pairs ordered by display_order.
 
         Convenience for routes that need to render a run's cases with their
@@ -1113,9 +1104,7 @@ class Repository:
         result = await self.session.execute(stmt)
         return [(rc, snap) for rc, snap in result.all()]
 
-    async def get_run_case_by_wombat_id(
-        self, *, run_id: uuid.UUID, wombat_id: str
-    ) -> RunCaseDB | None:
+    async def get_run_case_by_wombat_id(self, *, run_id: uuid.UUID, wombat_id: str) -> RunCaseDB | None:
         stmt = (
             select(RunCaseDB)
             .join(
@@ -1138,9 +1127,7 @@ class Repository:
 
     # --- Results (SP3.3) -----------------------------------------------------
 
-    async def get_result(
-        self, *, run_id: uuid.UUID, run_case_id: uuid.UUID
-    ) -> ResultDB | None:
+    async def get_result(self, *, run_id: uuid.UUID, run_case_id: uuid.UUID) -> ResultDB | None:
         stmt = select(ResultDB).where(
             ResultDB.run_id == run_id,
             ResultDB.run_case_id == run_case_id,
@@ -1243,11 +1230,7 @@ class Repository:
         of a result row and is never persisted.
         """
         # Count persisted result rows by status.
-        stmt = (
-            select(ResultDB.status, func.count())
-            .where(ResultDB.run_id == run_id)
-            .group_by(ResultDB.status)
-        )
+        stmt = select(ResultDB.status, func.count()).where(ResultDB.run_id == run_id).group_by(ResultDB.status)
         rows = (await self.session.execute(stmt)).all()
         buckets: dict[str, int] = {
             "pass": 0,
@@ -1260,11 +1243,7 @@ class Repository:
             buckets[status] = count
             recorded += count
         # Implicit "not_run" bucket.
-        total_q = (
-            select(func.count())
-            .select_from(RunCaseDB)
-            .where(RunCaseDB.run_id == run_id)
-        )
+        total_q = select(func.count()).select_from(RunCaseDB).where(RunCaseDB.run_id == run_id)
         total_cases = (await self.session.execute(total_q)).scalar_one()
         buckets["not_run"] = max(0, total_cases - recorded)
         return buckets
@@ -1303,9 +1282,7 @@ class Repository:
         )
         return list((await self.session.execute(stmt)).scalars())
 
-    async def get_evidence(
-        self, evidence_id: uuid.UUID
-    ) -> ResultEvidenceDB | None:
+    async def get_evidence(self, evidence_id: uuid.UUID) -> ResultEvidenceDB | None:
         return await self.session.get(ResultEvidenceDB, evidence_id)
 
     async def delete_evidence(self, evidence_id: uuid.UUID) -> None:
@@ -1361,8 +1338,5 @@ class Repository:
                     ),
                 )
             )
-        stmt = (
-            stmt.order_by(RunEventDB.created_at.desc(), RunEventDB.id.desc())
-            .limit(limit)
-        )
+        stmt = stmt.order_by(RunEventDB.created_at.desc(), RunEventDB.id.desc()).limit(limit)
         return list((await self.session.execute(stmt)).scalars())

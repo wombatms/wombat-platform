@@ -110,10 +110,7 @@ def start(
         str | None,
         typer.Option(
             "--filter-query",
-            help=(
-                "JSON filter dict selecting cases by attribute. "
-                "Mutually exclusive with --cases."
-            ),
+            help=("JSON filter dict selecting cases by attribute. Mutually exclusive with --cases."),
         ),
     ] = None,
     env: Annotated[
@@ -263,7 +260,8 @@ def record(
     status: Annotated[
         str,
         typer.Option(
-            "--status", "-s",
+            "--status",
+            "-s",
             help="Result status: p/pass, f/fail, b/blocked, s/skipped.",
         ),
     ],

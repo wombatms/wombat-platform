@@ -21,22 +21,26 @@ class Permission(StrEnum):
 # per-token grant) and are *additive* — never subtractive.
 ROLE_DEFAULT_PERMISSIONS: dict[Role, frozenset[Permission]] = {
     Role.viewer: frozenset({Permission.RUNS_READ}),
-    Role.editor: frozenset({
-        Permission.CONTENT_PROPOSE,
-        Permission.RUNS_READ,
-        Permission.RUNS_CREATE,
-        Permission.RUNS_RECORD,
-        Permission.RUNS_CLOSE,
-    }),
-    Role.admin: frozenset({
-        Permission.CONTENT_PROPOSE,
-        Permission.CONTENT_PUBLISH_DIRECT,
-        Permission.RUNS_READ,
-        Permission.RUNS_CREATE,
-        Permission.RUNS_RECORD,
-        Permission.RUNS_CLOSE,
-        Permission.RUNS_REOPEN,
-    }),
+    Role.editor: frozenset(
+        {
+            Permission.CONTENT_PROPOSE,
+            Permission.RUNS_READ,
+            Permission.RUNS_CREATE,
+            Permission.RUNS_RECORD,
+            Permission.RUNS_CLOSE,
+        }
+    ),
+    Role.admin: frozenset(
+        {
+            Permission.CONTENT_PROPOSE,
+            Permission.CONTENT_PUBLISH_DIRECT,
+            Permission.RUNS_READ,
+            Permission.RUNS_CREATE,
+            Permission.RUNS_RECORD,
+            Permission.RUNS_CLOSE,
+            Permission.RUNS_REOPEN,
+        }
+    ),
 }
 
 
