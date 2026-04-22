@@ -36,6 +36,7 @@ from wombat_api.database.models import (
     UserDB,
     UserProjectRoleDB,
 )
+from wombat_api.runs.exceptions import ResultConflictError
 from wombat_api.schemas.common import (
     ProjectCreate,
     UserCreate,
@@ -89,6 +90,18 @@ def _encode_cursor(dt: datetime) -> str:
 
 def _decode_cursor(cursor: str) -> datetime:
     return datetime.fromisoformat(base64.urlsafe_b64decode(cursor.encode()).decode())
+
+
+def _encode_event_cursor(dt: datetime, ev_id: uuid.UUID) -> str:
+    """Encode a (created_at, id) tuple for stable ordering under ties."""
+    raw = f"{dt.isoformat()}|{ev_id}"
+    return base64.urlsafe_b64encode(raw.encode()).decode()
+
+
+def _decode_event_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
+    raw = base64.urlsafe_b64decode(cursor.encode()).decode()
+    dt_str, id_str = raw.split("|", 1)
+    return datetime.fromisoformat(dt_str), uuid.UUID(id_str)
 
 
 @dataclass
@@ -911,3 +924,443 @@ class Repository:
                 )
             ).scalar_one()
         return row
+
+    # --- Runs (SP3.3) --------------------------------------------------------
+
+    async def create_run(
+        self,
+        *,
+        project_id: uuid.UUID,
+        title: str,
+        owner_id: uuid.UUID,
+        environment_id: uuid.UUID | None = None,
+        source: str = "manual",
+        parent_run_id: uuid.UUID | None = None,
+    ) -> RunDB:
+        row = RunDB(
+            project_id=project_id,
+            title=title,
+            owner_id=owner_id,
+            environment_id=environment_id,
+            source=source,
+            parent_run_id=parent_run_id,
+            status="open",
+        )
+        self.session.add(row)
+        await self.session.flush()
+        return row
+
+    async def get_run(self, run_id: uuid.UUID) -> RunDB | None:
+        return await self.session.get(RunDB, run_id)
+
+    async def list_runs(
+        self,
+        *,
+        project_id: uuid.UUID,
+        status: str | None = None,
+        environment_id: uuid.UUID | None = None,
+        owner_id: uuid.UUID | None = None,
+        q: str | None = None,
+        limit: int = 50,
+        cursor: str | None = None,
+    ) -> list[RunDB]:
+        stmt = select(RunDB).where(RunDB.project_id == project_id)
+        if status is not None:
+            stmt = stmt.where(RunDB.status == status)
+        if environment_id is not None:
+            stmt = stmt.where(RunDB.environment_id == environment_id)
+        if owner_id is not None:
+            stmt = stmt.where(RunDB.owner_id == owner_id)
+        if q:
+            like = f"%{q}%"
+            stmt = stmt.where(RunDB.title.ilike(like))
+        if cursor:
+            cutoff = _decode_cursor(cursor)
+            stmt = stmt.where(RunDB.created_at < cutoff)
+        stmt = stmt.order_by(RunDB.created_at.desc()).limit(limit)
+        return list((await self.session.execute(stmt)).scalars())
+
+    async def update_run_status(
+        self,
+        *,
+        run_id: uuid.UUID,
+        new_status: str,
+        note: str | None = None,
+    ) -> None:
+        run = await self.session.get(RunDB, run_id)
+        if run is None:
+            return
+        run.status = new_status
+        if note is not None:
+            run.closure_note = note
+        if new_status in ("completed", "aborted") and run.closed_at is None:
+            run.closed_at = datetime.now(UTC)
+        await self.session.flush()
+
+    async def set_started_at_if_unset(self, run_id: uuid.UUID) -> None:
+        run = await self.session.get(RunDB, run_id)
+        if run is None or run.started_at is not None:
+            return
+        run.started_at = datetime.now(UTC)
+        await self.session.flush()
+
+    # --- Assignees (SP3.3) ---------------------------------------------------
+
+    async def list_assignees(self, run_id: uuid.UUID) -> list[RunAssigneeDB]:
+        result = await self.session.execute(
+            select(RunAssigneeDB)
+            .where(RunAssigneeDB.run_id == run_id)
+            .order_by(RunAssigneeDB.added_at.asc())
+        )
+        return list(result.scalars())
+
+    async def add_assignee(
+        self,
+        *,
+        run_id: uuid.UUID,
+        user_id: uuid.UUID | None = None,
+        token_id: uuid.UUID | None = None,
+        added_by_user_id: uuid.UUID,
+    ) -> RunAssigneeDB:
+        row = RunAssigneeDB(
+            run_id=run_id,
+            user_id=user_id,
+            token_id=token_id,
+            added_by_user_id=added_by_user_id,
+        )
+        self.session.add(row)
+        await self.session.flush()
+        return row
+
+    async def remove_assignee(self, assignee_id: uuid.UUID) -> None:
+        row = await self.session.get(RunAssigneeDB, assignee_id)
+        if row is None:
+            return
+        await self.session.delete(row)
+        await self.session.flush()
+
+    async def is_principal_on_run(
+        self,
+        *,
+        run_id: uuid.UUID,
+        user_id: uuid.UUID | None = None,
+        token_id: uuid.UUID | None = None,
+    ) -> bool:
+        """Return True if the (user_id | token_id) is owner or assignee of this run."""
+        run = await self.session.get(RunDB, run_id)
+        if run is None:
+            return False
+        if user_id is not None and run.owner_id == user_id:
+            return True
+        conds = [RunAssigneeDB.run_id == run_id]
+        if user_id is not None:
+            conds.append(RunAssigneeDB.user_id == user_id)
+        elif token_id is not None:
+            conds.append(RunAssigneeDB.token_id == token_id)
+        else:
+            return False
+        q = select(func.count()).select_from(RunAssigneeDB).where(and_(*conds))
+        count = (await self.session.execute(q)).scalar_one()
+        return count > 0
+
+    # --- Run cases (SP3.3) ---------------------------------------------------
+
+    async def add_run_case(
+        self,
+        *,
+        run_id: uuid.UUID,
+        snapshot_id: uuid.UUID,
+        display_order: int,
+        added_by_user_id: uuid.UUID,
+    ) -> RunCaseDB:
+        row = RunCaseDB(
+            run_id=run_id,
+            snapshot_id=snapshot_id,
+            display_order=display_order,
+            added_by_user_id=added_by_user_id,
+        )
+        self.session.add(row)
+        await self.session.flush()
+        return row
+
+    async def list_run_cases(self, run_id: uuid.UUID) -> list[RunCaseDB]:
+        result = await self.session.execute(
+            select(RunCaseDB)
+            .where(RunCaseDB.run_id == run_id)
+            .order_by(RunCaseDB.display_order.asc())
+        )
+        return list(result.scalars())
+
+    async def list_run_cases_with_snapshots(
+        self, run_id: uuid.UUID
+    ) -> list[tuple[RunCaseDB, RunCaseSnapshotDB]]:
+        """Return (run_case, snapshot) pairs ordered by display_order.
+
+        Convenience for routes that need to render a run's cases with their
+        pinned snapshot body / title without issuing N+1 queries.
+        """
+        stmt = (
+            select(RunCaseDB, RunCaseSnapshotDB)
+            .join(
+                RunCaseSnapshotDB,
+                RunCaseDB.snapshot_id == RunCaseSnapshotDB.id,
+            )
+            .where(RunCaseDB.run_id == run_id)
+            .order_by(RunCaseDB.display_order.asc())
+        )
+        result = await self.session.execute(stmt)
+        return [(rc, snap) for rc, snap in result.all()]
+
+    async def get_run_case_by_wombat_id(
+        self, *, run_id: uuid.UUID, wombat_id: str
+    ) -> RunCaseDB | None:
+        stmt = (
+            select(RunCaseDB)
+            .join(
+                RunCaseSnapshotDB,
+                RunCaseDB.snapshot_id == RunCaseSnapshotDB.id,
+            )
+            .where(
+                RunCaseDB.run_id == run_id,
+                RunCaseSnapshotDB.snapshot_wombat_id == wombat_id,
+            )
+        )
+        return (await self.session.execute(stmt)).scalar_one_or_none()
+
+    async def remove_run_case(self, run_case_id: uuid.UUID) -> None:
+        row = await self.session.get(RunCaseDB, run_case_id)
+        if row is None:
+            return
+        await self.session.delete(row)
+        await self.session.flush()
+
+    # --- Results (SP3.3) -----------------------------------------------------
+
+    async def get_result(
+        self, *, run_id: uuid.UUID, run_case_id: uuid.UUID
+    ) -> ResultDB | None:
+        stmt = select(ResultDB).where(
+            ResultDB.run_id == run_id,
+            ResultDB.run_case_id == run_case_id,
+        )
+        return (await self.session.execute(stmt)).scalar_one_or_none()
+
+    async def upsert_result(
+        self,
+        *,
+        run_id: uuid.UUID,
+        run_case_id: uuid.UUID,
+        status: str,
+        source: str,
+        recorded_by_user_id: uuid.UUID | None = None,
+        recorded_by_token_id: uuid.UUID | None = None,
+        notes: str | None = None,
+        failed_at_step: int | None = None,
+        bug_links: list[dict] | None = None,
+        duration_ms: int | None = None,
+        expected_revision: int | None = None,
+    ) -> ResultDB:
+        """Insert or update the single result row for (run_id, run_case_id).
+
+        Revision semantics:
+          * New row -> revision=1; expected_revision must be None.
+          * Existing row + expected_revision matches current -> bump revision by 1.
+          * Mismatch -> raise ResultConflictError(current_revision).
+        """
+        existing = await self.get_result(run_id=run_id, run_case_id=run_case_id)
+        if existing is None:
+            if expected_revision is not None:
+                # There is no row yet — any non-None expected_revision is a
+                # mismatch against "not present" (treated as revision 0).
+                raise ResultConflictError(current_revision=0)
+            row = ResultDB(
+                run_id=run_id,
+                run_case_id=run_case_id,
+                status=status,
+                source=source,
+                recorded_by_user_id=recorded_by_user_id,
+                recorded_by_token_id=recorded_by_token_id,
+                notes=notes,
+                failed_at_step=failed_at_step,
+                bug_links=bug_links or [],
+                duration_ms=duration_ms,
+                revision=1,
+            )
+            self.session.add(row)
+            await self.session.flush()
+            return row
+
+        if expected_revision is not None and existing.revision != expected_revision:
+            raise ResultConflictError(current_revision=existing.revision)
+
+        existing.status = status
+        existing.source = source
+        existing.recorded_by_user_id = recorded_by_user_id
+        existing.recorded_by_token_id = recorded_by_token_id
+        existing.notes = notes
+        existing.failed_at_step = failed_at_step
+        existing.bug_links = bug_links or []
+        existing.duration_ms = duration_ms
+        existing.revision = existing.revision + 1
+        await self.session.flush()
+        return existing
+
+    async def clear_result(
+        self,
+        *,
+        run_id: uuid.UUID,
+        run_case_id: uuid.UUID,
+        expected_revision: int | None = None,
+    ) -> None:
+        existing = await self.get_result(run_id=run_id, run_case_id=run_case_id)
+        if existing is None:
+            return
+        if expected_revision is not None and existing.revision != expected_revision:
+            raise ResultConflictError(current_revision=existing.revision)
+        await self.session.delete(existing)
+        await self.session.flush()
+
+    async def list_results(
+        self,
+        *,
+        run_id: uuid.UUID,
+        status: str | None = None,
+    ) -> list[ResultDB]:
+        stmt = select(ResultDB).where(ResultDB.run_id == run_id)
+        if status is not None:
+            stmt = stmt.where(ResultDB.status == status)
+        stmt = stmt.order_by(ResultDB.created_at.asc())
+        return list((await self.session.execute(stmt)).scalars())
+
+    async def count_results_by_status(self, run_id: uuid.UUID) -> dict[str, int]:
+        """Return a histogram of result statuses for a run.
+
+        Always includes the four canonical buckets (pass / fail / blocked /
+        skipped) plus the implicit `not_run` bucket, computed as
+        `total_cases - sum(recorded statuses)`. `not_run` is the *absence*
+        of a result row and is never persisted.
+        """
+        # Count persisted result rows by status.
+        stmt = (
+            select(ResultDB.status, func.count())
+            .where(ResultDB.run_id == run_id)
+            .group_by(ResultDB.status)
+        )
+        rows = (await self.session.execute(stmt)).all()
+        buckets: dict[str, int] = {
+            "pass": 0,
+            "fail": 0,
+            "blocked": 0,
+            "skipped": 0,
+        }
+        recorded = 0
+        for status, count in rows:
+            buckets[status] = count
+            recorded += count
+        # Implicit "not_run" bucket.
+        total_q = (
+            select(func.count())
+            .select_from(RunCaseDB)
+            .where(RunCaseDB.run_id == run_id)
+        )
+        total_cases = (await self.session.execute(total_q)).scalar_one()
+        buckets["not_run"] = max(0, total_cases - recorded)
+        return buckets
+
+    # --- Evidence (SP3.3) ----------------------------------------------------
+
+    async def add_evidence(
+        self,
+        *,
+        result_id: uuid.UUID,
+        blob_id: str,
+        filename: str,
+        mime_type: str,
+        size_bytes: int,
+        uploaded_by_user_id: uuid.UUID | None = None,
+        uploaded_by_token_id: uuid.UUID | None = None,
+    ) -> ResultEvidenceDB:
+        row = ResultEvidenceDB(
+            result_id=result_id,
+            blob_id=blob_id,
+            filename=filename,
+            mime_type=mime_type,
+            size_bytes=size_bytes,
+            uploaded_by_user_id=uploaded_by_user_id,
+            uploaded_by_token_id=uploaded_by_token_id,
+        )
+        self.session.add(row)
+        await self.session.flush()
+        return row
+
+    async def list_evidence(self, *, result_id: uuid.UUID) -> list[ResultEvidenceDB]:
+        stmt = (
+            select(ResultEvidenceDB)
+            .where(ResultEvidenceDB.result_id == result_id)
+            .order_by(ResultEvidenceDB.uploaded_at.asc())
+        )
+        return list((await self.session.execute(stmt)).scalars())
+
+    async def get_evidence(
+        self, evidence_id: uuid.UUID
+    ) -> ResultEvidenceDB | None:
+        return await self.session.get(ResultEvidenceDB, evidence_id)
+
+    async def delete_evidence(self, evidence_id: uuid.UUID) -> None:
+        row = await self.session.get(ResultEvidenceDB, evidence_id)
+        if row is None:
+            return
+        await self.session.delete(row)
+        await self.session.flush()
+
+    # --- Events (SP3.3) ------------------------------------------------------
+
+    async def append_event(
+        self,
+        *,
+        run_id: uuid.UUID,
+        event_type: str,
+        payload: dict,
+        actor_user_id: uuid.UUID | None = None,
+        actor_token_id: uuid.UUID | None = None,
+    ) -> RunEventDB:
+        row = RunEventDB(
+            run_id=run_id,
+            event_type=event_type,
+            payload=payload,
+            actor_user_id=actor_user_id,
+            actor_token_id=actor_token_id,
+        )
+        self.session.add(row)
+        await self.session.flush()
+        return row
+
+    async def list_events(
+        self,
+        *,
+        run_id: uuid.UUID,
+        limit: int = 50,
+        cursor: str | None = None,
+    ) -> list[RunEventDB]:
+        """List run_events ordered (created_at DESC, id DESC) with cursor pagination.
+
+        Cursor encodes ``(created_at, id)`` as base64(ISO|uuid) so pagination
+        is stable across events sharing the same timestamp.
+        """
+        stmt = select(RunEventDB).where(RunEventDB.run_id == run_id)
+        if cursor:
+            created_at, ev_id = _decode_event_cursor(cursor)
+            stmt = stmt.where(
+                or_(
+                    RunEventDB.created_at < created_at,
+                    and_(
+                        RunEventDB.created_at == created_at,
+                        RunEventDB.id < ev_id,
+                    ),
+                )
+            )
+        stmt = (
+            stmt.order_by(RunEventDB.created_at.desc(), RunEventDB.id.desc())
+            .limit(limit)
+        )
+        return list((await self.session.execute(stmt)).scalars())
