@@ -85,6 +85,7 @@ _FIELD_ORDER: dict[type, list[str]] = {
         "id",
         "title",
         "description",
+        "parent_wombat_id",
         "owner",
         "tags",
         "cases",

@@ -12,6 +12,7 @@ class Suite(BaseModel):
     id: WombatID
     title: str
     description: str | None = None
+    parent_wombat_id: WombatID | None = None
     cases: list[WombatID] = []
     include: IncludeExclude = IncludeExclude()
     owner: str

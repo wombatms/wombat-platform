@@ -272,3 +272,16 @@ class TestSuite:
             include=IncludeExclude(tags_any=["regression"], components_any=["payments"]),
         )
         assert len(s.cases) == 1
+
+    def test_suite_parent_default_none(self):
+        s = Suite(id="SUITE-X", title="x", owner="@me")
+        assert s.parent_wombat_id is None
+
+    def test_suite_parent_round_trip(self):
+        s = Suite(
+            id="SUITE-X",
+            title="x",
+            owner="@me",
+            parent_wombat_id="SUITE-PARENT",
+        )
+        assert s.parent_wombat_id == "SUITE-PARENT"

@@ -71,6 +71,19 @@
       "default": null,
       "title": "Description"
     },
+    "parent_wombat_id": {
+      "anyOf": [
+        {
+          "pattern": "^(TC|SS|PLAN|STORY|SUITE)-[A-Z0-9][-A-Z0-9]*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Parent Wombat Id"
+    },
     "cases": {
       "default": [],
       "items": {
