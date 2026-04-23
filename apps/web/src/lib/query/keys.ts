@@ -8,6 +8,57 @@ export interface ProposalListFilters {
   limit?: number;
 }
 
+// ---------------------------------------------------------------------------
+// SP3.4 — Plans, Suites, Dashboards, Content-Resolve
+//
+// Design invariant: detail key is a prefix of resolve/startRun sub-resource
+// keys so a single removeQueries({ queryKey: planKeys.detail(slug, wid) })
+// clears the plan detail AND its resolved case list AND its start-run draft.
+// ---------------------------------------------------------------------------
+
+export const planKeys = {
+  /** Matches all plans for a project. */
+  all: (slug: string) => ["plans", slug] as const,
+  /** 3-element prefix shared by resolve + startRun below. */
+  detail: (slug: string, wid: string) => ["plans", slug, wid] as const,
+  /** Extends detail — cached resolved case set for a saved plan. */
+  resolve: (slug: string, wid: string) => ["plans", slug, wid, "resolve"] as const,
+  /** Extends detail — pre-filled run-draft payload. */
+  startRun: (slug: string, wid: string) => ["plans", slug, wid, "start-run"] as const,
+};
+
+export const suiteKeys = {
+  /** Matches all suites for a project. */
+  all: (slug: string) => ["suites", slug] as const,
+  /** Flat list with parent_wombat_id; client builds the tree. */
+  tree: (slug: string) => ["suites", slug, "tree"] as const,
+  /** 3-element prefix shared by resolve below. */
+  detail: (slug: string, wid: string) => ["suites", slug, wid] as const,
+  /** Extends detail — effective case set for the suite subtree. */
+  resolve: (slug: string, wid: string) => ["suites", slug, wid, "resolve"] as const,
+};
+
+export const dashboardKeys = {
+  /** Static widget metadata for a project — drives the frontend registry. */
+  meta: (slug: string) => ["dashboards", slug, "meta"] as const,
+  /**
+   * Per-widget cache entry.  `filters` is included in the key so changing any
+   * filter produces a new cache entry (back-forward nav stays populated).
+   * `w` = widget slug, `scope` = "project"|"plan", `sid` = scope_id.
+   */
+  widget: (slug: string, w: string, scope: string, sid: string, filters: object) =>
+    ["dashboards", slug, w, scope, sid, filters] as const,
+};
+
+export const resolveKeys = {
+  /**
+   * Key for the debounced draft-preview hook.  `hash` is a stable hash of the
+   * serialised body so rapid edits coalesce rather than evict.
+   */
+  draft: (slug: string, kind: string, hash: string) =>
+    ["content-resolve", slug, kind, hash] as const,
+};
+
 export const keys = {
   auth: {
     me: ["auth", "me"] as const,
