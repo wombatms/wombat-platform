@@ -314,6 +314,136 @@ class Repository:
         )
         return (await self.session.execute(q)).scalar_one_or_none()
 
+    async def get_content_by_wombat_ids(
+        self,
+        project_id: uuid.UUID,
+        wombat_ids: list[str],
+    ) -> list[Content]:
+        """Batch-fetch live Content rows by wombat_id within a single project.
+
+        Returns only rows whose wombat_id is in *wombat_ids* and which are not
+        soft-deleted.  Unknown IDs are silently skipped (no partial error).
+        Always scoped to *project_id* — never returns rows from other projects.
+        """
+        if not wombat_ids:
+            return []
+        q = select(Content).where(
+            and_(
+                Content.project_id == project_id,
+                Content.wombat_id.in_(wombat_ids),
+                Content.deleted_at.is_(None),
+            )
+        )
+        return list((await self.session.execute(q)).scalars())
+
+    async def list_suite_subtree(
+        self,
+        project_id: uuid.UUID,
+        root_wombat_id: str,
+        depth_limit: int = 20,
+    ) -> list[Content]:
+        """Return the root Suite plus every descendant Suite (BFS order).
+
+        * Scoped to *project_id*: the traversal never crosses project
+          boundaries, even if a same-named suite exists in another project.
+        * Only rows with ``kind='suite'`` are considered — a testcase with
+          ``parent_wombat_id`` pointing at a suite is never returned here.
+        * Depth capped by *depth_limit* (default 20, matching the linter's
+          MAX_SUITE_DEPTH).  A depth_limit of 0 returns only the root.
+        * Cycles are defended against regardless of dialect by tracking
+          visited wombat_ids.
+        * Postgres: single ``WITH RECURSIVE`` round-trip against the
+          ``content`` table.
+        * SQLite (unit tests): BFS in Python over a pre-loaded dict of
+          project suites — correctness equivalent; no DB round-trip win.
+        """
+        dialect = (
+            self.session.bind.dialect.name if self.session.bind is not None else "postgresql"
+        )
+
+        if dialect == "postgresql":
+            # Use a recursive CTE keyed on content.id, then hydrate ORM rows
+            # via a single IN query — keeps identity-map semantics and lets
+            # the connector reuse prepared statements.  Scoped to the single
+            # project; cross-project suites cannot leak because every level
+            # re-filters on ``project_id``.
+            from sqlalchemy import text
+
+            stmt = text(
+                """
+                WITH RECURSIVE subtree AS (
+                    SELECT c.id, c.wombat_id, 0 AS depth
+                      FROM content c
+                     WHERE c.project_id = :pid
+                       AND c.kind = 'suite'
+                       AND c.wombat_id = :root
+                       AND c.deleted_at IS NULL
+                    UNION ALL
+                    SELECT c.id, c.wombat_id, s.depth + 1 AS depth
+                      FROM content c
+                      JOIN subtree s
+                        ON (c.body ->> 'parent_wombat_id') = s.wombat_id
+                     WHERE c.project_id = :pid
+                       AND c.kind = 'suite'
+                       AND c.deleted_at IS NULL
+                       AND s.depth < :depth_limit
+                )
+                SELECT DISTINCT id FROM subtree
+                """
+            )
+            result = await self.session.execute(
+                stmt,
+                {"pid": project_id, "root": root_wombat_id, "depth_limit": depth_limit},
+            )
+            ids = [row[0] for row in result]
+            if not ids:
+                return []
+            # Hydrate to ORM rows in a single IN query.
+            rows_q = select(Content).where(Content.id.in_(ids))
+            return list((await self.session.execute(rows_q)).scalars())
+
+        # SQLite / other: Python BFS.  Load every live suite in the project
+        # once, then walk parent_wombat_id edges breadth-first.
+        all_suites_q = select(Content).where(
+            and_(
+                Content.project_id == project_id,
+                Content.kind == "suite",
+                Content.deleted_at.is_(None),
+            )
+        )
+        all_suites = list((await self.session.execute(all_suites_q)).scalars())
+        by_wid: dict[str, Content] = {s.wombat_id: s for s in all_suites if s.wombat_id}
+
+        root = by_wid.get(root_wombat_id)
+        if root is None:
+            return []
+
+        children_of: dict[str, list[Content]] = {}
+        for s in all_suites:
+            parent = (s.body or {}).get("parent_wombat_id")
+            if parent is None:
+                continue
+            children_of.setdefault(parent, []).append(s)
+
+        visited: set[str] = {root_wombat_id}
+        result: list[Content] = [root]
+        frontier: list[Content] = [root]
+        depth = 0
+        while frontier and depth < depth_limit:
+            next_frontier: list[Content] = []
+            for node in frontier:
+                if not node.wombat_id:
+                    continue
+                for child in children_of.get(node.wombat_id, []):
+                    if not child.wombat_id or child.wombat_id in visited:
+                        continue
+                    visited.add(child.wombat_id)
+                    result.append(child)
+                    next_frontier.append(child)
+            frontier = next_frontier
+            depth += 1
+        return result
+
     async def list_content(
         self,
         project_id: uuid.UUID,

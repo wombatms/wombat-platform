@@ -120,6 +120,16 @@ def _register_routes(app: FastAPI) -> None:
     app.include_router(environments.router, prefix="/api/projects", tags=["environments"])
     app.include_router(proposals.router)  # prefix already set in router definition
 
+    # SP3.4 planning-tier routes.
+    from wombat_api.planning import routes as planning_routes
+
+    app.include_router(planning_routes.router, prefix="/api/projects", tags=["planning"])
+
+    # SP3.4 dashboard routes.
+    from wombat_api.dashboards import routes as dashboards_routes
+
+    app.include_router(dashboards_routes.router, prefix="/api/projects", tags=["dashboards"])
+
     # SP3.3 execution-tier routes — registered when the modules are available.
     # ``runs.py`` and ``evidence.py`` are delivered by Tasks 18–22; until
     # then the import silently skips so earlier tasks can start the server.

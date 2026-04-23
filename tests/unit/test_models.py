@@ -15,7 +15,7 @@ from wombat_core.models.common import (
     TestCaseStatus,
     TestType,
 )
-from wombat_core.models.plan import Environment, IncludeExclude, Plan, ScopeSelector
+from wombat_core.models.plan import Environment, ExplicitCases, IncludeExclude, Plan, ScopeSelector
 from wombat_core.models.shared_step import SharedStep
 from wombat_core.models.story import Story
 from wombat_core.models.suite import Suite
@@ -203,11 +203,38 @@ class TestPlan:
             execution=ExecutionMode.mixed,
             assignees=["payments-qa"],
             approvals=["qa-lead", "release-manager"],
-            explicit_cases=["TC-PAYMENTS-REFUND-0012"],
+            explicit_cases={"add": ["TC-PAYMENTS-REFUND-0012"], "remove": []},
         )
         assert p.scope.product == "checkout"
         assert len(p.environments) == 2
-        assert "TC-PAYMENTS-REFUND-0012" in p.explicit_cases
+        assert "TC-PAYMENTS-REFUND-0012" in p.explicit_cases.add
+
+    def test_plan_explicit_cases_is_add_remove_dict(self):
+        p = Plan(
+            id="PLAN-X",
+            title="x",
+            explicit_cases={"add": ["TC-1"], "remove": ["TC-2"]},
+        )
+        assert p.explicit_cases.add == ["TC-1"]
+        assert p.explicit_cases.remove == ["TC-2"]
+
+    def test_plan_explicit_cases_default_empty_add_remove(self):
+        p = Plan(id="PLAN-X", title="x")
+        assert isinstance(p.explicit_cases, ExplicitCases)
+        assert p.explicit_cases.add == []
+        assert p.explicit_cases.remove == []
+
+    def test_plan_suite_refs_default_empty(self):
+        p = Plan(id="PLAN-X", title="x")
+        assert p.suite_refs == []
+
+    def test_plan_suite_refs_round_trip(self):
+        p = Plan(
+            id="PLAN-X",
+            title="x",
+            suite_refs=["SUITE-A", "SUITE-B"],
+        )
+        assert p.suite_refs == ["SUITE-A", "SUITE-B"]
 
 
 class TestStory:
@@ -245,3 +272,16 @@ class TestSuite:
             include=IncludeExclude(tags_any=["regression"], components_any=["payments"]),
         )
         assert len(s.cases) == 1
+
+    def test_suite_parent_default_none(self):
+        s = Suite(id="SUITE-X", title="x", owner="@me")
+        assert s.parent_wombat_id is None
+
+    def test_suite_parent_round_trip(self):
+        s = Suite(
+            id="SUITE-X",
+            title="x",
+            owner="@me",
+            parent_wombat_id="SUITE-PARENT",
+        )
+        assert s.parent_wombat_id == "SUITE-PARENT"

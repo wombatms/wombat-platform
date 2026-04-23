@@ -4,6 +4,7 @@ Web frontend for the Wombat test-case-management platform. Vite + React 18 + Typ
 
 SP3.2 added the first write path (proposal review + publish).
 SP3.3 added manual + automated execution runs (create, record, close, reopen, rerun).
+SP3.4 added Plan + Suite authoring (shared `ContentBuilder` with live preview) and five release-management dashboards (project-home + plan-home).
 
 - **Design spec (SP3.1):** [`docs/superpowers/specs/2026-04-21-wombat-platform-sub-project-3-1-design.md`](../../../docs/superpowers/specs/2026-04-21-wombat-platform-sub-project-3-1-design.md)
 - **Plan (SP3.1):** [`docs/plans/2026-04-21-wombat-platform-sub-project-3-1.md`](../../../docs/plans/2026-04-21-wombat-platform-sub-project-3-1.md)
@@ -11,6 +12,8 @@ SP3.3 added manual + automated execution runs (create, record, close, reopen, re
 - **Plan (SP3.2):** [`docs/plans/2026-04-21-wombat-platform-sub-project-3-2.md`](../../../docs/plans/2026-04-21-wombat-platform-sub-project-3-2.md)
 - **Design spec (SP3.3):** [`docs/superpowers/specs/2026-04-22-wombat-platform-sub-project-3-3-design.md`](../../../docs/superpowers/specs/2026-04-22-wombat-platform-sub-project-3-3-design.md)
 - **Plan (SP3.3):** [`docs/plans/2026-04-22-wombat-platform-sub-project-3-3.md`](../../../docs/plans/2026-04-22-wombat-platform-sub-project-3-3.md)
+- **Design spec (SP3.4):** [`docs/superpowers/specs/2026-04-22-wombat-platform-sub-project-3-4-design.md`](../../../docs/superpowers/specs/2026-04-22-wombat-platform-sub-project-3-4-design.md)
+- **Plan (SP3.4):** [`docs/plans/2026-04-22-wombat-platform-sub-project-3-4.md`](../../../docs/plans/2026-04-22-wombat-platform-sub-project-3-4.md)
 
 ## Prerequisites
 
@@ -222,6 +225,91 @@ pnpm --filter web exec openapi-typescript apps/web/openapi.snapshot.json \
 Then `pnpm --filter web typecheck` and commit both files together. CI's
 `check-openapi-drift.sh` will fail if `schema.d.ts` and the live
 `/openapi.json` diverge.
+
+## SP3.4 surface — Planning + Dashboards
+
+### New routes
+
+| Route | Purpose |
+|---|---|
+| `/p/:slug` | **Project-home dashboard** (replaces the old project landing; 5 widgets, time/env/plan filter bar) |
+| `/p/:slug/library` | The previous project landing — Library unchanged plus a Suites sidebar section |
+| `/p/:slug/plans` | Plans list (title, release, case count, last run, status) |
+| `/p/:slug/plans/new` | `ContentBuilder` in **create** mode (kind=plan) |
+| `/p/:slug/plans/:wid` | Plan detail — metadata + resolved case list + **Start run** + **Dashboard** link |
+| `/p/:slug/plans/:wid/edit` | `ContentBuilder` in **edit** mode (kind=plan) |
+| `/p/:slug/plans/:wid/dashboard` | Plan-home dashboard (same 5 widgets, scoped to the plan) |
+| `/p/:slug/suites` | Suite tree view (left = hierarchy, right = effective case list for selected node) |
+| `/p/:slug/suites/new` | `ContentBuilder` in **create** mode (kind=suite); optional parent pre-select |
+| `/p/:slug/suites/:wid` | Suite detail |
+| `/p/:slug/suites/:wid/edit` | `ContentBuilder` in **edit** mode (kind=suite) |
+
+All SP3.4 pages are route-split (`React.lazy`) and excluded from the main-bundle gate. See the exclusion list in `apps/web/scripts/check-bundle-budget.sh`.
+
+### ContentBuilder — one form, two kinds
+
+`src/features/plans/ContentBuilder.tsx` is a single component that handles both
+**plan** and **suite** authoring, for both **create** and **edit**. It switches
+fields by `kind` and never forks into parallel implementations. The call sites
+are the four builder pages (`PlanBuilderPage`, `SuiteBuilderPage`).
+
+- **Left pane** — structured form (title, description, filter, explicit cases, suite refs, environments, assignees, approvals, tags). Advanced sections collapse by default.
+- **Right pane** — live preview: a 250 ms-debounced `POST /content/resolve` feeds a virtualized case list with source badges (`filter` / `suite_ref:<id>` / `explicit`). `AbortController` cancels stale requests. See `use-resolve-draft.ts`.
+- **Footer** — Save (creates a proposal), Save and start run (plans only), Cancel. Writes flow through SP3.2's `POST /proposals` with `kind=plan|suite` — no bespoke write endpoints.
+
+### Widget registry pattern
+
+Dashboards are a thin shell around a registry. The contract lives in
+`src/features/dashboards/widgets/index.ts`:
+
+```ts
+export const WIDGETS = {
+  passfail_trend:     { title: "Pass / fail trend",   Component: PassFailTrend },
+  recent_runs:        { title: "Recent runs",         Component: RecentRuns },
+  top_failing_cases:  { title: "Top failing cases",   Component: TopFailingCases },
+  review_backlog:     { title: "Review backlog",      Component: ReviewBacklog },
+  release_readiness:  { title: "Release readiness",   Component: ReleaseReadiness },
+} as const satisfies Record<string, WidgetRegistryEntry>;
+```
+
+`<DashboardPage>` iterates the registry and renders each as
+`<WidgetFrame title={...}><Component scope={...} filters={...}/></WidgetFrame>`.
+Widgets fetch their own data via TanStack Query keyed on
+`[slug, scope, filters]` and call `GET /dashboards/widget/:slug`.
+
+### Adding a sixth widget
+
+1. **Backend** — drop a query function in
+   `packages/api/src/wombat_api/dashboards/widgets/<slug>.py` and call
+   `REGISTRY.register(meta, query)` at module import.
+2. **Frontend** — add a component in
+   `src/features/dashboards/widgets/<Slug>.tsx` and register it in the
+   `WIDGETS` object above.
+3. **Grid slot** — update `<DashboardPage>`'s 12-column grid layout to assign
+   the new widget rows/cols for both `scope="project"` and `scope="plan"`.
+4. **Tests** — add a Vitest that mocks the endpoint and asserts the happy
+   path + one error state; add a pytest for the backend query function.
+5. **Perf** — confirm the widget completes within the 500 ms p95 target at
+   5,000 results in-window. If it misses, move the query into a
+   pre-aggregation rollup per deferred item §6.1 in the spec.
+
+### Live dashboard perf targets
+
+- `POST /content/resolve` p95 **< 300 ms** at project with ≤ 2,000 content rows and suite depth ≤ 5.
+- `GET /dashboards/widget/{slug}` p95 **< 500 ms** at ≤ 5,000 results in window.
+
+Breaches are logged server-side and surface as the explicit trigger to move a
+widget to a pre-aggregated rollup table (spec §6 item 1 — deferred).
+
+### Deferred follow-ups surfaced during SP3.4
+
+| # | Item | Trigger to address |
+|---|---|---|
+| 1 | `CreateRunRequest.plan_id` backend field | Plan→Run handoff currently pre-fills the form; server doesn't persist `plan_id` on submit. Small backend schema patch. |
+| 2 | `/testcases?suite_ref=` query param | Library Suites sidebar currently filters client-side. Add server-side filter when suite subtrees grow large. |
+| 3 | `/components` API | `FilterBuilder` uses free-text for now; add a real endpoint once `component` lands as a first-class field. |
+| 4 | Playwright live-stack gating | Several SP3.4 E2E specs have `.skip()` branches that require a live API + seeded runs; CI runs the full set. |
+| 5 | Pre-aggregated widget rollups | Revisit when any widget p95 exceeds 500 ms. |
 
 ## UI changes — `frontend-design` skill required
 

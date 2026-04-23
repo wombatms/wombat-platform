@@ -7,9 +7,12 @@ from wombat_core.linting.engine import LintEngine, LintIssue, LintRule
 from wombat_core.linting.rules import (
     AmbiguousLanguageRule,
     IDFormatRule,
+    PlanSuiteRefUnknownRule,
     QualityRule,
     ReferenceIntegrityRule,
     RequiredFieldsRule,
+    SuiteCycleRule,
+    SuiteSelfParentRule,
     TaxonomyRule,
     default_rules,
 )
@@ -347,4 +350,112 @@ class TestLintEngine:
 
     def test_default_rules_count(self):
         rules = default_rules()
-        assert len(rules) == 6  # noqa: PLR2004
+        assert len(rules) == 9  # noqa: PLR2004
+
+
+# ---------------------------------------------------------------------------
+# SP3.4: Suite hierarchy + plan/suite cross-reference rules
+# ---------------------------------------------------------------------------
+
+
+def _suite(eid="SUITE-A", title="Suite A", owner="qa", **kw):
+    return Suite(id=eid, title=title, owner=owner, **kw)
+
+
+def _plan(eid="PLAN-X", title="Plan X", **kw):
+    return Plan(id=eid, title=title, **kw)
+
+
+class TestSuiteSelfParentRule:
+    rule = SuiteSelfParentRule()
+    cfg = _config()
+
+    def test_self_parent_is_error(self):
+        s = _suite(eid="SUITE-A", parent_wombat_id="SUITE-A")
+        issues = self.rule.check(s, self.cfg)
+        assert any(i.severity == "error" for i in issues)
+        assert any(i.field == "parent_wombat_id" for i in issues)
+
+    def test_no_parent_ok(self):
+        s = _suite(eid="SUITE-A")
+        assert self.rule.check(s, self.cfg) == []
+
+    def test_different_parent_ok(self):
+        s = _suite(eid="SUITE-A", parent_wombat_id="SUITE-B")
+        assert self.rule.check(s, self.cfg) == []
+
+
+class TestSuiteCycleRule:
+    rule = SuiteCycleRule()
+    cfg = _config()
+
+    def test_two_suite_cycle(self):
+        a = _suite(eid="SUITE-A", parent_wombat_id="SUITE-B")
+        b = _suite(eid="SUITE-B", parent_wombat_id="SUITE-A")
+        issues = self.rule.check_corpus([a, b], self.cfg)
+        assert any(i.severity == "error" for i in issues)
+        cycle_entities = {i.entity_id for i in issues}
+        assert cycle_entities == {"SUITE-A", "SUITE-B"}
+
+    def test_three_suite_cycle(self):
+        a = _suite(eid="SUITE-A", parent_wombat_id="SUITE-B")
+        b = _suite(eid="SUITE-B", parent_wombat_id="SUITE-C")
+        c = _suite(eid="SUITE-C", parent_wombat_id="SUITE-A")
+        issues = self.rule.check_corpus([a, b, c], self.cfg)
+        assert len(issues) >= 1
+        assert all(i.severity == "error" for i in issues)
+
+    def test_linear_tree_ok(self):
+        a = _suite(eid="SUITE-A")
+        b = _suite(eid="SUITE-B", parent_wombat_id="SUITE-A")
+        c = _suite(eid="SUITE-C", parent_wombat_id="SUITE-B")
+        assert self.rule.check_corpus([a, b, c], self.cfg) == []
+
+    def test_missing_parent_is_not_cycle(self):
+        # A parent pointing at a suite that does not exist is not a cycle;
+        # the "unknown ref" issue is handled elsewhere.
+        a = _suite(eid="SUITE-A", parent_wombat_id="SUITE-MISSING")
+        assert self.rule.check_corpus([a], self.cfg) == []
+
+
+class TestPlanSuiteRefUnknownRule:
+    rule = PlanSuiteRefUnknownRule()
+    cfg = _config()
+
+    def test_unknown_ref_is_warning(self):
+        p = _plan(eid="PLAN-X", suite_refs=["SUITE-MISSING"])
+        issues = self.rule.check_corpus([p], self.cfg)
+        bad = [i for i in issues if i.rule == "plan_suite_ref_unknown"]
+        assert bad and bad[0].severity == "warning"
+        assert bad[0].entity_id == "PLAN-X"
+        assert bad[0].field == "suite_refs"
+
+    def test_known_ref_ok(self):
+        s = _suite(eid="SUITE-A")
+        p = _plan(eid="PLAN-X", suite_refs=["SUITE-A"])
+        assert self.rule.check_corpus([s, p], self.cfg) == []
+
+    def test_empty_suite_refs_ok(self):
+        p = _plan(eid="PLAN-X")
+        assert self.rule.check_corpus([p], self.cfg) == []
+
+
+class TestEngineIntegrationSP34:
+    def test_engine_emits_cycle_code_via_corpus(self):
+        engine = LintEngine(_config())
+        a = _suite(eid="SUITE-A", parent_wombat_id="SUITE-B")
+        b = _suite(eid="SUITE-B", parent_wombat_id="SUITE-A")
+        issues = engine.lint_corpus([a, b])
+        assert any(i.rule == "suite_cycle" for i in issues)
+
+    def test_engine_emits_self_parent_code(self):
+        engine = LintEngine(_config())
+        s = _suite(eid="SUITE-A", parent_wombat_id="SUITE-A")
+        issues = engine.lint_corpus([s])
+        assert any(i.rule == "suite_self_parent" for i in issues)
+
+    def test_engine_emits_plan_suite_ref_unknown(self):
+        engine = LintEngine(_config())
+        p = _plan(eid="PLAN-X", suite_refs=["SUITE-MISSING"])
+        issues = engine.lint_corpus([p])
+        assert any(i.rule == "plan_suite_ref_unknown" for i in issues)

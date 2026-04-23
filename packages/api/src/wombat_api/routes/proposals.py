@@ -37,6 +37,90 @@ from wombat_api.schemas.proposals import (
 router = APIRouter(prefix="/api/projects/{project_slug}/proposals", tags=["proposals"])
 
 
+async def _validate_suite_proposal(
+    project_id: uuid.UUID,
+    proposed_body: dict,
+    repo,
+) -> None:
+    """Validate suite-specific invariants on write.
+
+    Raises HTTPException(422) on:
+    - SUITE_CYCLE: parent_wombat_id chain leads back to itself.
+    - SUITE_PARENT_OTHER_PROJECT: parent_wombat_id belongs to a different project.
+
+    Self-parent (parent_wombat_id == own id) is a special case of cycle and
+    is caught by the same walk.
+    """
+    from sqlalchemy import select
+
+    from wombat_api.database.models import Content
+
+    parent_wid: str | None = (proposed_body or {}).get("parent_wombat_id")
+    own_wid: str | None = (proposed_body or {}).get("id")
+    if not parent_wid:
+        return  # no parent → nothing to check
+
+    # Self-parent check (SUITE_CYCLE trivial case).
+    if own_wid and parent_wid == own_wid:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "SUITE_CYCLE",
+                "message": f"Suite {own_wid} cannot be its own parent.",
+                "field": "parent_wombat_id",
+            },
+        )
+
+    # Walk the parent chain checking:
+    #   a) every ancestor lives in the same project (cross-project check).
+    #   b) none of the ancestors equals own_wid (cycle check).
+    visited: set[str] = set()
+    if own_wid:
+        visited.add(own_wid)
+
+    current_parent = parent_wid
+    while current_parent:
+        if current_parent in visited:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "SUITE_CYCLE",
+                    "message": f"Suite hierarchy cycle detected at {current_parent}.",
+                    "field": "parent_wombat_id",
+                },
+            )
+        # Look up the parent in the DB.
+        q = select(Content).where(
+            Content.wombat_id == current_parent,
+            Content.kind == "suite",
+            Content.deleted_at.is_(None),
+        )
+        result = (await repo.session.execute(q)).scalars().all()
+        if not result:
+            break  # parent not in DB yet — allow (will be validated at publish)
+
+        # Check that this parent belongs to the same project.
+        same_project_rows = [r for r in result if r.project_id == project_id]
+        other_project_rows = [r for r in result if r.project_id != project_id]
+        if other_project_rows and not same_project_rows:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "SUITE_PARENT_OTHER_PROJECT",
+                    "message": (
+                        f"Suite parent '{current_parent}' belongs to a different project."
+                    ),
+                    "field": "parent_wombat_id",
+                },
+            )
+
+        visited.add(current_parent)
+        parent_row = same_project_rows[0] if same_project_rows else None
+        if parent_row is None:
+            break
+        current_parent = (parent_row.body or {}).get("parent_wombat_id") or None
+
+
 @router.post("", status_code=201)
 async def create_proposal(
     body: ProposalCreate,
@@ -48,6 +132,11 @@ async def create_proposal(
     require_direct_publish(principal, role, auto_approve)
 
     repo = Repository(session)
+
+    # Suite-specific write-side validation (SP3.4, Task 21).
+    if body.kind == "suite":
+        await _validate_suite_proposal(project.id, body.proposed_body or {}, repo)
+
     try:
         proposal = await repo.create_proposal(
             project_id=project.id,

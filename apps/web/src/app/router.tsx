@@ -24,6 +24,51 @@ import { RunCreatePage } from "@/features/runs/pages/RunCreatePage";
 import { RunDetailPage } from "@/features/runs/pages/RunDetailPage";
 import { SettingsEnvironmentsPage } from "@/features/runs/pages/SettingsEnvironmentsPage";
 
+// SP3.4 — Plans, Suites, Dashboards are route-split to keep the main bundle
+// under the 250 KB warning threshold.  Recharts (pulled in by dashboard
+// widgets) and ContentBuilder are the primary size contributors; moving these
+// routes behind React.lazy() removes them from the initial parse budget.
+const ProjectDashboardPage = lazy(() =>
+  import("@/features/dashboards/ProjectDashboardPage").then((m) => ({
+    default: m.ProjectDashboardPage,
+  })),
+);
+const PlansListPage = lazy(() =>
+  import("@/features/plans/PlansListPage").then((m) => ({
+    default: m.PlansListPage,
+  })),
+);
+const PlanDetailPage = lazy(() =>
+  import("@/features/plans/PlanDetailPage").then((m) => ({
+    default: m.PlanDetailPage,
+  })),
+);
+const PlanBuilderPage = lazy(() =>
+  import("@/features/plans/PlanBuilderPage").then((m) => ({
+    default: m.PlanBuilderPage,
+  })),
+);
+const PlanDashboardPage = lazy(() =>
+  import("@/features/plans/PlanDashboardPage").then((m) => ({
+    default: m.PlanDashboardPage,
+  })),
+);
+const SuiteTreePage = lazy(() =>
+  import("@/features/suites/SuiteTreePage").then((m) => ({
+    default: m.SuiteTreePage,
+  })),
+);
+const SuiteDetailPage = lazy(() =>
+  import("@/features/suites/SuiteDetailPage").then((m) => ({
+    default: m.SuiteDetailPage,
+  })),
+);
+const SuiteBuilderPage = lazy(() =>
+  import("@/features/suites/SuiteBuilderPage").then((m) => ({
+    default: m.SuiteBuilderPage,
+  })),
+);
+
 // SP3.3 — Runner is code-split; must not appear in the main bundle.
 const LazyRunExecutePage = lazy(
   () => import("@/features/runs/pages/RunExecutePage"),
@@ -57,6 +102,33 @@ function ProposalFallback() {
       aria-label="Loading"
     >
       {[48, 32, 280].map((h, i) => (
+        <div
+          key={i}
+          className="rounded-md animate-pulse"
+          style={{
+            height: h,
+            background: "var(--bg-surface-2)",
+            border: "1px solid var(--border-default)",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Sp34Fallback — loading skeleton used for SP3.4 route-split pages
+ * (dashboards, plans, suites).  A sparse three-row skeleton keeps the
+ * AppShell chrome visible and gives a sense of the incoming layout.
+ */
+function Sp34Fallback() {
+  return (
+    <div
+      className="flex flex-col gap-4 p-6"
+      aria-busy="true"
+      aria-label="Loading"
+    >
+      {[32, 120, 220].map((h, i) => (
         <div
           key={i}
           className="rounded-md animate-pulse"
@@ -115,7 +187,92 @@ export function Router() {
         <Route path="/projects" element={<ProjectPickerPage />} />
 
         <Route path="/p/:projectSlug">
-          <Route index element={<Navigate to="library" replace />} />
+          {/* SP3.4: project home is now the Dashboard (lazy — recharts widget) */}
+          <Route
+            index
+            element={
+              <Suspense fallback={<Sp34Fallback />}>
+                <ProjectDashboardPage />
+              </Suspense>
+            }
+          />
+
+          {/* SP3.4: Plans (lazy — ContentBuilder + recharts via PlanDashboardPage) */}
+          <Route
+            path="plans"
+            element={
+              <Suspense fallback={<Sp34Fallback />}>
+                <PlansListPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="plans/new"
+            element={
+              <Suspense fallback={<Sp34Fallback />}>
+                <PlanBuilderPage mode="create" />
+              </Suspense>
+            }
+          />
+          <Route
+            path="plans/:wid"
+            element={
+              <Suspense fallback={<Sp34Fallback />}>
+                <PlanDetailPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="plans/:wid/edit"
+            element={
+              <Suspense fallback={<Sp34Fallback />}>
+                <PlanBuilderPage mode="edit" />
+              </Suspense>
+            }
+          />
+          <Route
+            path="plans/:wid/dashboard"
+            element={
+              <Suspense fallback={<Sp34Fallback />}>
+                <PlanDashboardPage />
+              </Suspense>
+            }
+          />
+
+          {/* SP3.4: Suites (lazy — SuiteTree + ContentBuilder) */}
+          <Route
+            path="suites"
+            element={
+              <Suspense fallback={<Sp34Fallback />}>
+                <SuiteTreePage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="suites/new"
+            element={
+              <Suspense fallback={<Sp34Fallback />}>
+                <SuiteBuilderPage mode="create" />
+              </Suspense>
+            }
+          />
+          <Route
+            path="suites/:wid"
+            element={
+              <Suspense fallback={<Sp34Fallback />}>
+                <SuiteDetailPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="suites/:wid/edit"
+            element={
+              <Suspense fallback={<Sp34Fallback />}>
+                <SuiteBuilderPage mode="edit" />
+              </Suspense>
+            }
+          />
+
           <Route path="library" element={<LibraryPage />} />
           <Route path="library/:wombatId" element={<TestcaseDetailPage />} />
           <Route path="shared-steps" element={<SharedStepListPage />} />

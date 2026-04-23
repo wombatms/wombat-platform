@@ -448,6 +448,87 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_slug}/plans/{wombat_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resolve Plan
+         * @description Return the ResolvedPlan for the published plan body.
+         *
+         *     Loads the most-recent published plan content row and runs it through
+         *     ResolveService.  No draft body is accepted here; use
+         *     POST /{project_slug}/content/resolve for draft-preview.
+         *
+         *     Permissions: viewer or higher (content read is authenticated + project-scoped).
+         */
+        get: operations["resolve_plan_api_projects__project_slug__plans__wombat_id__resolve_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_slug}/plans/{wombat_id}/clone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Clone Plan
+         * @description Deep-copy a plan body into a new proposal with a new wombat_id.
+         *
+         *     The clone is submitted as a proposal with kind='plan'.  The caller must
+         *     have content:propose permission (editor or admin by default).
+         *
+         *     The resulting proposal is open and waiting for review/approval through the
+         *     existing SP3.2 proposal flow.
+         *
+         *     Permissions: content:propose (editor+)
+         */
+        post: operations["clone_plan_api_projects__project_slug__plans__wombat_id__clone_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_slug}/plans/{wombat_id}/start-run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Run Draft
+         * @description Return a pre-filled run-creation draft derived from the plan.
+         *
+         *     Does NOT create a run.  The caller passes the returned StartRunDraft to
+         *     POST /runs to actually create the run.  This endpoint only hydrates the
+         *     run-create form with the plan's environments, assignees, and resolved case
+         *     count.
+         *
+         *     Permissions: viewer or higher (content read is authenticated + project-scoped).
+         */
+        post: operations["start_run_draft_api_projects__project_slug__plans__wombat_id__start_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_slug}/stories": {
         parameters: {
             query?: never;
@@ -491,6 +572,63 @@ export interface paths {
         };
         /** List Suites */
         get: operations["list_suites_api_projects__project_slug__suites_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_slug}/suites/tree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Suite Tree
+         * @description Return all suite rows as a flat node list.
+         *
+         *     Each node exposes exactly three fields:
+         *     - ``wombat_id`` — the suite's unique ID
+         *     - ``title``     — display name
+         *     - ``parent_wombat_id`` — parent's wombat_id, or null for root suites
+         *
+         *     Clients build the tree structure client-side from this flat representation.
+         *     No pagination: suite hierarchies are bounded (depth ≤ 20, breadth ≤ project
+         *     content count) and the flat list is cheap to fetch.
+         *
+         *     Permissions: viewer or higher.
+         */
+        get: operations["list_suite_tree_api_projects__project_slug__suites_tree_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_slug}/suites/{wombat_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resolve Suite
+         * @description Return the ResolvedSuite for a suite root (including its full subtree).
+         *
+         *     Uses ResolveService.resolve_suite which performs a recursive BFS over the
+         *     suite hierarchy.  Returns cases contributed by the root suite and all
+         *     descendant suites.
+         *
+         *     Permissions: viewer or higher (content read is authenticated + project-scoped).
+         */
+        get: operations["resolve_suite_api_projects__project_slug__suites__wombat_id__resolve_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -788,6 +926,112 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_slug}/content/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve Draft
+         * @description Draft plan or suite preview endpoint.
+         *
+         *     Accepts an unsaved draft body and returns the resolved case set
+         *     **without persisting anything** — no proposal rows, no content rows.
+         *
+         *     This is the live-preview transport used by the builder form while the
+         *     user is still editing.  The response shape is identical to the saved-plan
+         *     resolve endpoint (GET /api/projects/{project_slug}/plans/{wombat_id}/resolve) so the
+         *     frontend can reuse the same response handler.
+         *
+         *     Behaviour by ``kind``:
+         *     - ``"plan"`` — delegates to ``ResolveService.resolve_plan``, which runs the
+         *       full filter / suite-ref / explicit-cases composition pipeline.
+         *     - ``"suite"`` — synthesises a suite in memory from the draft's ``cases``
+         *       list + ``include`` filter, resolves titles and returns a ``ResolvedSuite``.
+         *       If the draft body has ``parent_wombat_id``, the draft resolution does NOT
+         *       recurse into the unsaved parent chain; drafts stand alone.  This is by
+         *       design: the parent doesn't exist in the DB yet, so there's nothing to
+         *       walk.
+         *     - anything else → 422.
+         *
+         *     Auth: any project viewer may call this endpoint (read-only; same auth as
+         *     ``GET /api/projects/{project_slug}/plans``).
+         */
+        post: operations["resolve_draft_api_projects__project_slug__content_resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_slug}/dashboards/widgets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Widgets
+         * @description Return metadata for all registered dashboard widgets.
+         *
+         *     Callers use this to discover which widgets exist, what scopes they support,
+         *     and what filters (if any) are required.
+         *
+         *     Response::
+         *
+         *         {
+         *             "widgets": [
+         *                 {
+         *                     "slug": "passfail_trend",
+         *                     "title": "Pass / fail trend",
+         *                     "scope_kinds": ["plan", "project"],
+         *                     "requires": []
+         *                 },
+         *                 …
+         *             ]
+         *         }
+         */
+        get: operations["list_widgets_api_projects__project_slug__dashboards_widgets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/projects/{project_slug}/dashboards/widget/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Widget
+         * @description Dispatch a widget query and return its result.
+         *
+         *     Validation order:
+         *     1. 404 if slug not registered.
+         *     2. 400 if scope not in ``meta["scope_kinds"]``.
+         *     3. 400 if any key in ``meta["requires"]`` is missing from the effective filters
+         *        when scope is ``"project"`` (on plan scope the plan is already in scope_id).
+         *     4. Build ``WidgetScope`` and ``WidgetFilters``, then call the widget query.
+         */
+        get: operations["get_widget_api_projects__project_slug__dashboards_widget__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects/{project_slug}/runs": {
         parameters: {
             query?: never;
@@ -952,7 +1196,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List Result Evidence
+         * @description List evidence records attached to a specific run result.
+         *
+         *     Returns all evidence attached to the result for the given case in the given
+         *     run, ordered by upload time ascending.  Each record carries id, filename,
+         *     mime_type, size_bytes, uploaded_by, and uploaded_at — callers use
+         *     GET /api/evidence/{id}/url to obtain a presigned download URL.
+         */
+        get: operations["list_result_evidence_api_projects__project_slug__runs__run_id__results__case_id__evidence_get"];
         put?: never;
         /** Upload Evidence */
         post: operations["upload_evidence_api_projects__project_slug__runs__run_id__results__case_id__evidence_post"];
@@ -1007,10 +1260,44 @@ export interface paths {
          * Get Evidence Url
          * @description Return a presigned URL for the given evidence record.
          *
-         *     Joins evidence → result → run → project to verify the caller has
-         *     RUNS_READ on the parent project.  Returns {url, expires_at}.
+         *     Joins evidence → result → run → project to verify the evidence exists.
+         *     Returns {url, expires_at}.
+         *
+         *     NOTE: Auth is intentionally omitted here — the signed URL itself (for
+         *     LocalFS: HMAC sig+exp; for S3: AWS presigned URL) is the security boundary.
+         *     A future iteration can plumb proper RUNS_READ auth once the endpoint URL
+         *     moves under /projects/{slug}.
          */
         get: operations["get_evidence_url_api_evidence__evidence_id__url_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/evidence/{blob_path}/url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Serve Localfs Blob
+         * @description Serve a LocalFS evidence blob after HMAC signature validation.
+         *
+         *     This endpoint is the "download" counterpart to LocalFSBackend.get_url().
+         *     It is intentionally unauthenticated — the HMAC signature (keyed by the
+         *     signing_key configured for the LocalFSBackend) acts as the bearer credential.
+         *
+         *     Args:
+         *         blob_path: URL-decoded blob identifier, e.g. ``{project_id}/{sha}.ext``.
+         *         sig: HMAC-SHA256 hex digest of ``"{blob_id}:{exp}"``.
+         *         exp: Unix epoch seconds at which the URL expires.
+         */
+        get: operations["serve_localfs_blob_evidence__blob_path__url_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1128,6 +1415,13 @@ export interface components {
             /** Case Ids */
             case_ids?: string[] | null;
         };
+        /** ClonePlanRequest */
+        ClonePlanRequest: {
+            /** New Wombat Id */
+            new_wombat_id: string;
+            /** Title */
+            title?: string | null;
+        };
         /** CloseRunRequest */
         CloseRunRequest: {
             /**
@@ -1212,6 +1506,21 @@ export interface components {
             source: string;
             case_selection: components["schemas"]["CaseSelection"];
         };
+        /**
+         * DraftResolveRequest
+         * @description Request body for ``POST /{project_slug}/content/resolve``.
+         *
+         *     Accepts an unsaved draft body and returns the resolved case set without
+         *     persisting anything.
+         */
+        DraftResolveRequest: {
+            /** Kind */
+            kind: string;
+            /** Body */
+            body: {
+                [key: string]: unknown;
+            };
+        };
         /** EnvironmentCreate */
         EnvironmentCreate: {
             /** Name */
@@ -1275,7 +1584,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "testcase" | "shared_step" | "story";
+            kind: "testcase" | "shared_step" | "story" | "plan" | "suite";
             /** Content Id */
             content_id?: string | null;
             /** Source Path */
@@ -2261,6 +2570,106 @@ export interface operations {
             };
         };
     };
+    resolve_plan_api_projects__project_slug__plans__wombat_id__resolve_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_slug: string;
+                wombat_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clone_plan_api_projects__project_slug__plans__wombat_id__clone_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_slug: string;
+                wombat_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClonePlanRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_run_draft_api_projects__project_slug__plans__wombat_id__start_run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_slug: string;
+                wombat_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_stories_api_projects__project_slug__stories_get: {
         parameters: {
             query?: {
@@ -2340,6 +2749,69 @@ export interface operations {
             header?: never;
             path: {
                 project_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_suite_tree_api_projects__project_slug__suites_tree_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_suite_api_projects__project_slug__suites__wombat_id__resolve_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_slug: string;
+                wombat_id: string;
             };
             cookie?: never;
         };
@@ -2959,6 +3431,117 @@ export interface operations {
             };
         };
     };
+    resolve_draft_api_projects__project_slug__content_resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftResolveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_widgets_api_projects__project_slug__dashboards_widgets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_widget_api_projects__project_slug__dashboards_widget__slug__get: {
+        parameters: {
+            query: {
+                /** @description Widget scope kind */
+                scope: "project" | "plan";
+                /** @description Project UUID (project scope) or plan wombat_id (plan scope) */
+                scope_id: string;
+                /** @description Time window: 7d | 30d | 90d | all */
+                window?: string;
+                /** @description Optional environment UUID filter */
+                env_id?: string | null;
+                /** @description Optional plan wombat_id filter (project scope only) */
+                plan_id?: string | null;
+            };
+            header?: never;
+            path: {
+                project_slug: string;
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_runs_api_projects__project_slug__runs_get: {
         parameters: {
             query?: {
@@ -3413,6 +3996,39 @@ export interface operations {
             };
         };
     };
+    list_result_evidence_api_projects__project_slug__runs__run_id__results__case_id__evidence_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_slug: string;
+                run_id: string;
+                case_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     upload_evidence_api_projects__project_slug__runs__run_id__results__case_id__evidence_post: {
         parameters: {
             query?: never;
@@ -3523,6 +4139,40 @@ export interface operations {
             header?: never;
             path: {
                 evidence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    serve_localfs_blob_evidence__blob_path__url_get: {
+        parameters: {
+            query: {
+                sig: string;
+                exp: number;
+            };
+            header?: never;
+            path: {
+                blob_path: string;
             };
             cookie?: never;
         };

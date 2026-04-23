@@ -4,10 +4,11 @@
 # Verifies that the main application bundle stays within the gzip budget.
 #
 # Route-split chunks (lazy-loaded pages such as RunExecutePage, EditForm,
-# ApprovalsInboxPage, etc.) are excluded from the gate — they are loaded
-# on demand and do not add to the initial page weight.
+# ApprovalsInboxPage, ProjectDashboardPage, PlansListPage, SuiteTreePage,
+# etc.) are excluded from the gate — they are loaded on demand and do not
+# add to the initial page weight.
 #
-# Thresholds (SP3.3 targets, applied to the main bundle only):
+# Thresholds (SP3.3/SP3.4 targets, applied to the main bundle only):
 #   Warning:  250 KB gzipped — prompts investigation but does not fail CI.
 #   Hard gate: 350 KB gzipped — fails CI (exits non-zero).
 #
@@ -15,10 +16,14 @@
 #   RunExecutePage-*  FocusMode-*  GridMode-*  CaseRenderer-*
 #   ApprovalsInboxPage-*  ReviewDetailPage-*  EditForm-*  ConflictWorkspace-*
 #   MarkdownDiffSplit-*
+#   SP3.4: ProjectDashboardPage-*  PlanDashboardPage-*  PlansListPage-*
+#          PlanDetailPage-*  PlanBuilderPage-*  SuiteTreePage-*
+#          SuiteDetailPage-*  SuiteBuilderPage-*
 #
 # Runner exclusion assertion:
-#   The script also asserts that the main bundle does NOT contain the string
-#   "RunExecutePage" as a guard against accidental eager-import regressions.
+#   The script also asserts that a RunExecutePage-*.js chunk file exists
+#   (confirming the lazy boundary held) as a guard against accidental
+#   eager-import regressions.
 #
 # Reads the Vite build output from apps/web/dist/assets/.
 
@@ -40,6 +45,15 @@ ROUTE_SPLIT_PATTERNS=(
   "EditForm"
   "ConflictWorkspace"
   "MarkdownDiffSplit"
+  # SP3.4 — dashboard, plans, suites pages (recharts + ContentBuilder)
+  "ProjectDashboardPage"
+  "PlanDashboardPage"
+  "PlansListPage"
+  "PlanDetailPage"
+  "PlanBuilderPage"
+  "SuiteTreePage"
+  "SuiteDetailPage"
+  "SuiteBuilderPage"
 )
 
 echo "==> Bundle budget check (main bundle: warn ${WARNING_KB} KB | hard gate ${BUDGET_KB} KB gzipped)"
@@ -150,8 +164,9 @@ else
 fi
 
 # Verify the route-split chunks we expect are all present
+# SP3.4 adds dashboard, plans, suites pages to the required list.
 missing_chunks=0
-for pattern in "RunExecutePage" "EditForm" "ApprovalsInboxPage"; do
+for pattern in "RunExecutePage" "EditForm" "ApprovalsInboxPage" "ProjectDashboardPage" "PlansListPage" "SuiteTreePage"; do
   count=$(find "${DIST_DIR}" -name "${pattern}-*.js" | wc -l | tr -d ' ')
   if [[ "${count}" -eq 0 ]]; then
     echo "    WARNING: No ${pattern}-*.js chunk found — route-split may have collapsed."

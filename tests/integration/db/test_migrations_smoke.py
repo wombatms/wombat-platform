@@ -36,6 +36,18 @@ SP3_3_TABLES = {
     "run_events",
 }
 
+# SP3.4 additive-only indexes.  Names that must exist on the given table
+# after ``alembic upgrade head`` completes.
+SP3_4_INDEXES: dict[str, set[str]] = {
+    "results": {"ix_results_run_finished"},
+    "runs": {
+        "ix_runs_project_finished",
+        "ix_runs_project_plan_finished",
+        "ix_runs_environment_finished",
+    },
+    "proposals": {"ix_proposals_project_status"},
+}
+
 
 def _docker_available() -> bool:
     try:
@@ -161,3 +173,114 @@ def test_alembic_upgrade_head_creates_all_sp3_3_tables(pg_dsn: str) -> None:
 
     # SP2 runs scaffolding must have been dropped by the SP3.3 migration.
     assert "execution_results" not in tables, "SP2 execution_results table should have been dropped by SP3.3 migration"
+
+
+def test_sp3_4_indexes_present_after_upgrade_head(pg_dsn: str) -> None:
+    """``alembic upgrade head`` creates all five SP3.4 dashboard indexes."""
+    import asyncio
+
+    from sqlalchemy import inspect
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    dsn = _fresh_database(pg_dsn)
+
+    env = os.environ.copy()
+    env["WOMBAT_DATABASE_URL"] = dsn
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=120,
+    )
+    assert result.returncode == 0, f"alembic upgrade head failed:\nSTDOUT: {result.stdout}\nSTDERR: {result.stderr}"
+
+    async def _collect() -> dict[str, set[str]]:
+        eng = create_async_engine(dsn)
+        try:
+            async with eng.connect() as c:
+                def _inspector_map(sync_conn):
+                    insp = inspect(sync_conn)
+                    return {
+                        table: {ix["name"] for ix in insp.get_indexes(table)}
+                        for table in SP3_4_INDEXES
+                    }
+
+                return await c.run_sync(_inspector_map)
+        finally:
+            await eng.dispose()
+
+    index_map = asyncio.run(_collect())
+    for table, expected_names in SP3_4_INDEXES.items():
+        present = index_map.get(table, set())
+        missing = expected_names - present
+        assert not missing, (
+            f"Missing SP3.4 indexes on {table}: {sorted(missing)}; present={sorted(present)}"
+        )
+
+
+def test_sp3_4_migration_down_up_cycles_cleanly(pg_dsn: str) -> None:
+    """Downgrading SP3.4 drops the 5 indexes; re-upgrading re-creates them.
+
+    Exercises the additive-only contract: the indexes added by 007 are
+    reversible without touching any other schema.
+    """
+    import asyncio
+
+    from sqlalchemy import inspect
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    dsn = _fresh_database(pg_dsn)
+
+    env = os.environ.copy()
+    env["WOMBAT_DATABASE_URL"] = dsn
+
+    # Upgrade head first.
+    up1 = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        capture_output=True, text=True, env=env, timeout=120,
+    )
+    assert up1.returncode == 0, up1.stderr
+
+    # Downgrade one revision.
+    down = subprocess.run(
+        [sys.executable, "-m", "alembic", "downgrade", "-1"],
+        capture_output=True, text=True, env=env, timeout=120,
+    )
+    assert down.returncode == 0, f"downgrade -1 failed:\nSTDERR: {down.stderr}"
+
+    async def _collect_indexes() -> dict[str, set[str]]:
+        eng = create_async_engine(dsn)
+        try:
+            async with eng.connect() as c:
+                def _inspector_map(sync_conn):
+                    insp = inspect(sync_conn)
+                    return {
+                        table: {ix["name"] for ix in insp.get_indexes(table)}
+                        for table in SP3_4_INDEXES
+                    }
+
+                return await c.run_sync(_inspector_map)
+        finally:
+            await eng.dispose()
+
+    after_down = asyncio.run(_collect_indexes())
+    for table, expected_names in SP3_4_INDEXES.items():
+        leftover = expected_names & after_down.get(table, set())
+        assert not leftover, (
+            f"Indexes still present after downgrade on {table}: {sorted(leftover)}"
+        )
+
+    # Re-upgrade.
+    up2 = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        capture_output=True, text=True, env=env, timeout=120,
+    )
+    assert up2.returncode == 0, f"re-upgrade failed:\nSTDERR: {up2.stderr}"
+
+    after_reup = asyncio.run(_collect_indexes())
+    for table, expected_names in SP3_4_INDEXES.items():
+        missing = expected_names - after_reup.get(table, set())
+        assert not missing, (
+            f"Missing indexes on {table} after re-upgrade: {sorted(missing)}"
+        )

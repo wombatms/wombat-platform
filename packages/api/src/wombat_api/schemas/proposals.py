@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 
 class ProposalCreate(BaseModel):
-    kind: Literal["testcase", "shared_step", "story"]
+    kind: Literal["testcase", "shared_step", "story", "plan", "suite"]
     content_id: UUID | None = None
     source_path: str
     base_revision: str

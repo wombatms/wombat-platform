@@ -12,7 +12,7 @@ Scenarios:
 - api:get_content → GETs /content/{id}
 - api:find_related_testcases → routes correctly for testcase_id and draft_text
 - api:list_sources → parses the response from /sources
-- Tool registry counts: both=25, local=5, api=20
+- Tool registry counts: both=35, local=5, api=30
 """
 
 from __future__ import annotations
@@ -33,13 +33,13 @@ INTEGRATION_REPO = Path(__file__).parent.parent.parent / "fixtures" / "integrati
 # ---------------------------------------------------------------------------
 
 
-def test_tool_registry_both_mode_has_31_tools():
-    """Both mode advertises exactly 31 tools (25 SP2 + 6 SP3.3 execution tier)."""
+def test_tool_registry_both_mode_has_35_tools():
+    """Both mode advertises exactly 35 tools (25 SP2 + 6 SP3.3 execution tier + 4 SP3.4 planning)."""
     from wombat_mcp.tools import build_tool_registry
 
     registry = build_tool_registry("both")
     tools = registry.tool_definitions()
-    assert len(tools) == 31, f"Expected 31 tools in 'both' mode, got {len(tools)}: {[t.name for t in tools]}"
+    assert len(tools) == 35, f"Expected 35 tools in 'both' mode, got {len(tools)}: {[t.name for t in tools]}"
 
 
 def test_tool_registry_local_mode_has_5_tools():
@@ -51,13 +51,13 @@ def test_tool_registry_local_mode_has_5_tools():
     assert len(tools) == 5, f"Expected 5 tools in 'local' mode, got {len(tools)}"
 
 
-def test_tool_registry_api_mode_has_26_tools():
-    """API mode advertises exactly 26 tools (20 SP2 + 6 SP3.3 execution tier)."""
+def test_tool_registry_api_mode_has_30_tools():
+    """API mode advertises exactly 30 tools (20 SP2 + 6 SP3.3 execution tier + 4 SP3.4 planning)."""
     from wombat_mcp.tools import build_tool_registry
 
     registry = build_tool_registry("api")
     tools = registry.tool_definitions()
-    assert len(tools) == 26, f"Expected 26 tools in 'api' mode, got {len(tools)}"
+    assert len(tools) == 30, f"Expected 30 tools in 'api' mode, got {len(tools)}"
 
 
 def test_both_mode_includes_all_local_and_api_tools():

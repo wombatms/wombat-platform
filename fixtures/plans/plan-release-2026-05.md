@@ -43,9 +43,11 @@ approvals:
   - release-manager
   - vp-engineering
 explicit_cases:
-  - TC-PAYMENTS-CHECKOUT-0001
-  - TC-AUTH-LOGIN-0001
-  - TC-CHECKOUT-CART-0001
+  add:
+    - TC-PAYMENTS-CHECKOUT-0001
+    - TC-AUTH-LOGIN-0001
+    - TC-CHECKOUT-CART-0001
+  remove: []
 ---
 
 ## Release Validation Plan

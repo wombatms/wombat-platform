@@ -39,6 +39,12 @@ Tools registered:
   - ``api:get_content``          GET  /api/projects/{slug}/content/{id}
   - ``api:find_related_testcases``  /search (semantic) or /content/{id}/related
   - ``api:list_sources``         GET  /api/projects/{slug}/sources
+
+  Planning + Dashboards (SP3.4):
+  - ``save_plan``                POST /api/{slug}/proposals  (kind=plan)
+  - ``save_suite``               POST /api/{slug}/proposals  (kind=suite)
+  - ``resolve_plan``             POST /api/{slug}/content/resolve  OR  GET /api/{slug}/plans/{wid}/resolve
+  - ``get_dashboard_widget``     GET  /api/{slug}/dashboards/widget/{widget_slug}
 """
 
 from __future__ import annotations
@@ -385,6 +391,141 @@ _TOOLS: list[types.Tool] = [
                 },
             },
             "required": ["project", "run_id", "reason"],
+        },
+    ),
+    # --- SP3.4 planning + dashboards (spec §5.6) ---
+    types.Tool(
+        name="save_plan",
+        description=(
+            "Save (create or update) a test plan by submitting it as a proposal. "
+            "Returns the created proposal record. "
+            "Plan body must contain an 'id' field (wombat_id). "
+            "Provide base_revision (git SHA) to update an existing plan; omit for new plans."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "project_slug": {"type": "string", "description": "Project slug."},
+                "plan_body": {
+                    "type": "object",
+                    "description": (
+                        "Full plan body dict. Must include 'id' (wombat_id). "
+                        "Other fields: title, include, exclude, suite_refs, "
+                        "explicit_cases: {add, remove}."
+                    ),
+                },
+                "base_revision": {
+                    "type": "string",
+                    "description": "Git SHA of the revision being edited (required for updates; omit for new plans).",
+                },
+            },
+            "required": ["project_slug", "plan_body"],
+        },
+    ),
+    types.Tool(
+        name="save_suite",
+        description=(
+            "Save (create or update) a test suite by submitting it as a proposal. "
+            "Returns the created proposal record. "
+            "Suite body must contain an 'id' field (wombat_id). "
+            "Provide base_revision (git SHA) to update an existing suite; omit for new suites."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "project_slug": {"type": "string", "description": "Project slug."},
+                "suite_body": {
+                    "type": "object",
+                    "description": (
+                        "Full suite body dict. Must include 'id' (wombat_id). "
+                        "Other fields: title, parent_wombat_id, cases, include, exclude."
+                    ),
+                },
+                "base_revision": {
+                    "type": "string",
+                    "description": "Git SHA of the revision being edited (required for updates; omit for new suites).",
+                },
+            },
+            "required": ["project_slug", "suite_body"],
+        },
+    ),
+    types.Tool(
+        name="resolve_plan",
+        description=(
+            "Resolve a plan into its effective set of test cases. "
+            "Provide exactly one of plan_body (for unsaved drafts) or plan_wombat_id (for saved plans). "
+            "Returns ResolvedPlan: cases list, count, by_source breakdown, warnings."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "project_slug": {"type": "string", "description": "Project slug."},
+                "plan_body": {
+                    "type": "object",
+                    "description": (
+                        "Draft plan body to resolve (unsaved). "
+                        "POSTs to /content/resolve for live preview."
+                    ),
+                },
+                "plan_wombat_id": {
+                    "type": "string",
+                    "description": (
+                        "WombatID of an already-saved plan. "
+                        "GETs /plans/{wid}/resolve."
+                    ),
+                },
+            },
+            "required": ["project_slug"],
+        },
+    ),
+    types.Tool(
+        name="get_dashboard_widget",
+        description=(
+            "Fetch data for a single dashboard widget. "
+            "scope must be 'project' or 'plan'. "
+            "scope_id is the project slug (for project scope) or plan wombat_id (for plan scope). "
+            "Use env_name to filter by environment name; the tool resolves it to an env_id automatically. "
+            "plan_wombat_id is required by the 'release_readiness' widget when scope='project'."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "project_slug": {"type": "string", "description": "Project slug."},
+                "widget_slug": {
+                    "type": "string",
+                    "enum": [
+                        "passfail_trend",
+                        "recent_runs",
+                        "top_failing_cases",
+                        "review_backlog",
+                        "release_readiness",
+                    ],
+                    "description": "Slug of the widget to fetch.",
+                },
+                "scope": {
+                    "type": "string",
+                    "enum": ["project", "plan"],
+                    "description": "Dashboard scope.",
+                },
+                "scope_id": {
+                    "type": "string",
+                    "description": "Project slug (project scope) or plan wombat_id (plan scope).",
+                },
+                "window": {
+                    "type": "string",
+                    "enum": ["7d", "30d", "90d", "all"],
+                    "description": "Time window for trend-based widgets.",
+                },
+                "env_name": {
+                    "type": "string",
+                    "description": "Environment name to filter by. Resolved to env_id automatically.",
+                },
+                "plan_wombat_id": {
+                    "type": "string",
+                    "description": "Plan wombat_id filter (required for release_readiness on project scope).",
+                },
+            },
+            "required": ["project_slug", "widget_slug", "scope"],
         },
     ),
     # --- sync / import ---
@@ -808,6 +949,143 @@ async def _sp33_close_run(args: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# SP3.4 planning + dashboards handlers (spec §5.6)
+# ---------------------------------------------------------------------------
+
+
+async def _sp34_save_plan(args: dict) -> dict:
+    """POST /api/{slug}/proposals with kind=plan.
+
+    The plan body's own ``id`` field is used as the wombat_id.  This mirrors
+    the file-format convention where the plan's WombatID lives in the body.
+    """
+    project = args["project_slug"]
+    plan_body = args["plan_body"]
+    wombat_id = plan_body.get("id")
+    payload: dict = {
+        "kind": "plan",
+        "wombat_id": wombat_id,
+        "body": plan_body,
+    }
+    if args.get("base_revision") is not None:
+        payload["base_revision"] = args["base_revision"]
+    async with _client() as c:
+        r = await c.post(f"/api/{project}/proposals", json=payload)
+        r.raise_for_status()
+        return r.json()
+
+
+async def _sp34_save_suite(args: dict) -> dict:
+    """POST /api/{slug}/proposals with kind=suite.
+
+    Mirrors ``_sp34_save_plan`` but for suites.
+    """
+    project = args["project_slug"]
+    suite_body = args["suite_body"]
+    wombat_id = suite_body.get("id")
+    payload: dict = {
+        "kind": "suite",
+        "wombat_id": wombat_id,
+        "body": suite_body,
+    }
+    if args.get("base_revision") is not None:
+        payload["base_revision"] = args["base_revision"]
+    async with _client() as c:
+        r = await c.post(f"/api/{project}/proposals", json=payload)
+        r.raise_for_status()
+        return r.json()
+
+
+async def _sp34_resolve_plan(args: dict) -> dict:
+    """Resolve a plan into its effective set of test cases.
+
+    Exactly one of ``plan_body`` (draft) or ``plan_wombat_id`` (saved plan)
+    must be supplied:
+
+    - ``plan_body``       → POST /api/{slug}/content/resolve  (live preview)
+    - ``plan_wombat_id`` → GET  /api/{slug}/plans/{wid}/resolve
+    """
+    project = args["project_slug"]
+    plan_body = args.get("plan_body")
+    plan_wombat_id = args.get("plan_wombat_id")
+
+    has_body = plan_body is not None
+    has_wid = plan_wombat_id is not None
+
+    if has_body == has_wid:
+        # Both provided or neither provided.
+        if has_body:
+            raise ValueError(
+                "resolve_plan: provide exactly one of plan_body or plan_wombat_id, not both."
+            )
+        raise ValueError(
+            "resolve_plan: exactly one of plan_body or plan_wombat_id is required."
+        )
+
+    async with _client() as c:
+        if has_body:
+            r = await c.post(
+                f"/api/{project}/content/resolve",
+                json={"kind": "plan", "body": plan_body},
+            )
+        else:
+            r = await c.get(f"/api/{project}/plans/{plan_wombat_id}/resolve")
+        r.raise_for_status()
+        return r.json()
+
+
+async def _sp34_get_dashboard_widget(args: dict) -> dict:
+    """GET /api/{slug}/dashboards/widget/{widget_slug} with mapped query params.
+
+    If ``env_name`` is given, resolve it to an ``env_id`` by calling
+    GET /api/{slug}/environments?name={env_name} first.  If no matching
+    environment is found, a ValueError is raised so the agent can correct the
+    name before retrying.
+
+    ``plan_wombat_id`` is forwarded as the ``plan_id`` query param.
+    """
+    project = args["project_slug"]
+    widget_slug = args["widget_slug"]
+    scope = args["scope"]
+
+    params: dict = {"scope": scope}
+    if args.get("scope_id") is not None:
+        params["scope_id"] = args["scope_id"]
+    if args.get("window") is not None:
+        params["window"] = args["window"]
+    if args.get("plan_wombat_id") is not None:
+        params["plan_id"] = args["plan_wombat_id"]
+
+    env_name = args.get("env_name")
+    if env_name is not None:
+        # Resolve env_name → env_id via the environments list endpoint.
+        async with _client() as c:
+            env_r = await c.get(
+                f"/api/{project}/environments",
+                params={"name": env_name},
+            )
+            env_r.raise_for_status()
+            env_payload = env_r.json()
+            # Expect {data: [{id, name, ...}, ...]}
+            envs = env_payload.get("data") or []
+            match = next((e for e in envs if e.get("name") == env_name), None)
+            if match is None:
+                raise ValueError(
+                    f"get_dashboard_widget: no environment named '{env_name}' in project '{project}'. "
+                    "Check the name or omit env_name to fetch unfiltered data."
+                )
+            params["env_id"] = match["id"]
+
+    async with _client() as c:
+        r = await c.get(
+            f"/api/{project}/dashboards/widget/{widget_slug}",
+            params=params,
+        )
+        r.raise_for_status()
+        return r.json()
+
+
+# ---------------------------------------------------------------------------
 # Dispatch table
 # ---------------------------------------------------------------------------
 
@@ -841,6 +1119,11 @@ async def _dispatch(name: str, args: dict) -> object:
         "record_result": _sp33_record_result,
         "attach_evidence": _sp33_attach_evidence,
         "close_run": _sp33_close_run,
+        # SP3.4 planning + dashboards
+        "save_plan": _sp34_save_plan,
+        "save_suite": _sp34_save_suite,
+        "resolve_plan": _sp34_resolve_plan,
+        "get_dashboard_widget": _sp34_get_dashboard_widget,
     }
     handler = dispatch.get(name)
     if handler is None:
