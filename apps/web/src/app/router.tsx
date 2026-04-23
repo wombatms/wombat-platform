@@ -23,6 +23,15 @@ import { RunsPage } from "@/features/runs/pages/RunsPage";
 import { RunCreatePage } from "@/features/runs/pages/RunCreatePage";
 import { RunDetailPage } from "@/features/runs/pages/RunDetailPage";
 import { SettingsEnvironmentsPage } from "@/features/runs/pages/SettingsEnvironmentsPage";
+// SP3.4 — Plans, Suites, Dashboards (stubs; Wave 8/9 agents replace with full impls)
+import { ProjectDashboardPage } from "@/features/dashboards/ProjectDashboardPage";
+import { PlansListPage } from "@/features/plans/PlansListPage";
+import { PlanDetailPage } from "@/features/plans/PlanDetailPage";
+import { PlanBuilderPage } from "@/features/plans/PlanBuilderPage";
+import { PlanDashboardPage } from "@/features/plans/PlanDashboardPage";
+import { SuiteTreePage } from "@/features/suites/SuiteTreePage";
+import { SuiteDetailPage } from "@/features/suites/SuiteDetailPage";
+import { SuiteBuilderPage } from "@/features/suites/SuiteBuilderPage";
 
 // SP3.3 — Runner is code-split; must not appear in the main bundle.
 const LazyRunExecutePage = lazy(
@@ -115,7 +124,22 @@ export function Router() {
         <Route path="/projects" element={<ProjectPickerPage />} />
 
         <Route path="/p/:projectSlug">
-          <Route index element={<Navigate to="library" replace />} />
+          {/* SP3.4: project home is now the Dashboard */}
+          <Route index element={<ProjectDashboardPage />} />
+
+          {/* SP3.4: Plans */}
+          <Route path="plans" element={<PlansListPage />} />
+          <Route path="plans/new" element={<PlanBuilderPage mode="create" />} />
+          <Route path="plans/:wid" element={<PlanDetailPage />} />
+          <Route path="plans/:wid/edit" element={<PlanBuilderPage mode="edit" />} />
+          <Route path="plans/:wid/dashboard" element={<PlanDashboardPage />} />
+
+          {/* SP3.4: Suites */}
+          <Route path="suites" element={<SuiteTreePage />} />
+          <Route path="suites/new" element={<SuiteBuilderPage mode="create" />} />
+          <Route path="suites/:wid" element={<SuiteDetailPage />} />
+          <Route path="suites/:wid/edit" element={<SuiteBuilderPage mode="edit" />} />
+
           <Route path="library" element={<LibraryPage />} />
           <Route path="library/:wombatId" element={<TestcaseDetailPage />} />
           <Route path="shared-steps" element={<SharedStepListPage />} />

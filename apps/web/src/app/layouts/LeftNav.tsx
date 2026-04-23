@@ -2,7 +2,10 @@ import type { ComponentType, KeyboardEvent, SVGProps } from "react";
 import { useCallback, useRef } from "react";
 import { NavLink, useParams } from "react-router-dom";
 import {
+  LayoutDashboard,
   BookOpen,
+  ClipboardList,
+  FolderTree,
   Share2,
   BookMarked,
   Search,
@@ -23,8 +26,16 @@ interface NavItem {
   badge?: number;
 }
 
-function useNavItems(projectSlug: string | undefined): {
-  primary: NavItem[];
+/**
+ * Nav group: items within a visual section separated by a rule.
+ * Groups are rendered in order with a divider between them.
+ */
+interface NavGroup {
+  items: NavItem[];
+}
+
+function useNavGroups(projectSlug: string | undefined): {
+  groups: NavGroup[];
   secondary: NavItem[];
 } {
   const base = projectSlug ? `/p/${projectSlug}` : "";
@@ -32,11 +43,23 @@ function useNavItems(projectSlug: string | undefined): {
   const canPropose = usePermission(projectSlug ?? "", "content:propose");
   const { data: inboxCount } = useInboxBadge(projectSlug ?? "");
 
-  const primary: NavItem[] = [
+  // Group 1 — project home + content authoring
+  const contentItems: NavItem[] = [
+    { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, to: base || "/projects", disabled: noProject },
     { key: "library", label: "Test Library", icon: BookOpen, to: `${base}/library`, disabled: noProject },
+    { key: "plans", label: "Plans", icon: ClipboardList, to: `${base}/plans`, disabled: noProject },
+    { key: "suites", label: "Suites", icon: FolderTree, to: `${base}/suites`, disabled: noProject },
+  ];
+
+  // Group 2 — execution
+  const executionItems: NavItem[] = [
+    { key: "runs", label: "Runs", icon: PlayCircle, to: `${base}/runs`, disabled: noProject },
+  ];
+
+  // Group 3 — discovery + review
+  const discoveryItems: NavItem[] = [
     { key: "shared-steps", label: "Shared Steps", icon: Share2, to: `${base}/shared-steps`, disabled: noProject },
     { key: "stories", label: "Stories", icon: BookMarked, to: `${base}/stories`, disabled: noProject },
-    { key: "runs", label: "Runs", icon: PlayCircle, to: `${base}/runs`, disabled: noProject },
     { key: "search", label: "Search", icon: Search, to: `${base}/search`, disabled: noProject },
     ...(canPropose && !noProject
       ? [{
@@ -53,8 +76,16 @@ function useNavItems(projectSlug: string | undefined): {
     { key: "settings", label: "Settings", icon: Settings, to: "/settings/profile" },
   ];
 
-  return { primary, secondary };
+  return {
+    groups: [
+      { items: contentItems },
+      { items: executionItems },
+      { items: discoveryItems },
+    ],
+    secondary,
+  };
 }
+
 
 function NavItemLink({ item }: { item: NavItem }) {
   const Icon = item.icon;
@@ -113,7 +144,7 @@ function NavItemLink({ item }: { item: NavItem }) {
 
 export function LeftNav() {
   const { projectSlug } = useParams<{ projectSlug?: string }>();
-  const { primary, secondary } = useNavItems(projectSlug);
+  const { groups, secondary } = useNavGroups(projectSlug);
   const navRef = useRef<HTMLElement>(null);
 
   // Keyboard: up/down between nav links
@@ -140,13 +171,27 @@ export function LeftNav() {
       onKeyDown={handleKeyDown}
       className="flex h-full flex-col gap-1 px-2 py-3"
     >
-      <ul className="flex flex-col gap-0.5">
-        {primary.map((item) => (
-          <li key={item.key}>
-            <NavItemLink item={item} />
-          </li>
-        ))}
-      </ul>
+      {groups.map((group, gi) => (
+        <div key={gi}>
+          {gi > 0 && (
+            <div
+              className="my-2 h-px"
+              style={{ background: "var(--border-default)" }}
+              role="separator"
+              aria-hidden="true"
+            />
+          )}
+          <ul className="flex flex-col gap-0.5">
+            {group.items.map((item) => (
+              <li key={item.key}>
+                <NavItemLink item={item} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+
+      <div className="flex-1" aria-hidden="true" />
 
       <div
         className="my-2 h-px"
