@@ -74,6 +74,7 @@ _FIELD_ORDER: dict[type, list[str]] = {
         "scope",
         "include",
         "exclude",
+        "suite_refs",
         "environments",
         "execution",
         "assignees",

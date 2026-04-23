@@ -24,6 +24,13 @@ class Environment(BaseModel):
     config: dict[str, str] = {}
 
 
+class ExplicitCases(BaseModel):
+    """Additive and subtractive overrides applied on top of filter + suite_refs resolution."""
+
+    add: list[WombatID] = []
+    remove: list[WombatID] = []
+
+
 class Plan(BaseModel):
     id: WombatID
     title: str
@@ -31,8 +38,9 @@ class Plan(BaseModel):
     scope: ScopeSelector = ScopeSelector()
     include: IncludeExclude = IncludeExclude()
     exclude: IncludeExclude = IncludeExclude()
+    suite_refs: list[WombatID] = []
     environments: list[Environment] = []
     execution: ExecutionMode = ExecutionMode.mixed
     assignees: list[str] = []
     approvals: list[str] = []
-    explicit_cases: list[WombatID] = []
+    explicit_cases: ExplicitCases = ExplicitCases()
