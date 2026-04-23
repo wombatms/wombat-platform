@@ -11,6 +11,11 @@ import {
   CaseAlreadyInRunError,
   EnvironmentNotFoundError,
   isApiError,
+  SuiteCycleError,
+  SuiteDepthLimitError,
+  WidgetMissingFilterError,
+  UnknownWidgetError,
+  mapPlanningError,
 } from "./errors";
 
 // ---------------------------------------------------------------------------
@@ -227,5 +232,115 @@ describe("ResultConflictError hint parsing", () => {
     const raw = makeApiError("result_conflict", "bad", 409, hint);
     const mapped = callMapRunError(raw) as ResultConflictError;
     expect(mapped.currentRevision).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SP3.4 — mapPlanningError
+// ---------------------------------------------------------------------------
+
+/**
+ * Wrap mapPlanningError so tests can assert on the thrown value.
+ */
+function callMapPlanningError(err: unknown): ApiError {
+  try {
+    mapPlanningError(err);
+  } catch (thrown) {
+    return thrown as ApiError;
+  }
+  throw new Error("mapPlanningError did not throw");
+}
+
+describe("mapPlanningError — SP3.4 typed errors", () => {
+  it("maps SUITE_CYCLE (422) to SuiteCycleError", () => {
+    const raw = makeApiError("SUITE_CYCLE", "Cycle detected in suite tree", 422);
+    const mapped = callMapPlanningError(raw);
+    expect(mapped).toBeInstanceOf(SuiteCycleError);
+    expect(mapped.name).toBe("SuiteCycleError");
+    expect(mapped.message).toBe("Cycle detected in suite tree");
+    expect(mapped.code).toBe("SUITE_CYCLE");
+    expect(mapped.status).toBe(422);
+  });
+
+  it("SuiteCycleError is an ApiError", () => {
+    const raw = makeApiError("SUITE_CYCLE", "cycle", 422);
+    expect(callMapPlanningError(raw)).toBeInstanceOf(ApiError);
+  });
+
+  it("maps SUITE_DEPTH_LIMIT (500) to SuiteDepthLimitError", () => {
+    const raw = makeApiError("SUITE_DEPTH_LIMIT", "Suite tree exceeds depth limit", 500);
+    const mapped = callMapPlanningError(raw);
+    expect(mapped).toBeInstanceOf(SuiteDepthLimitError);
+    expect(mapped.name).toBe("SuiteDepthLimitError");
+    expect(mapped.code).toBe("SUITE_DEPTH_LIMIT");
+    expect(mapped.status).toBe(500);
+  });
+
+  it("SuiteDepthLimitError is an ApiError", () => {
+    const raw = makeApiError("SUITE_DEPTH_LIMIT", "too deep", 500);
+    expect(callMapPlanningError(raw)).toBeInstanceOf(ApiError);
+  });
+
+  it("maps WIDGET_MISSING_FILTER (400) to WidgetMissingFilterError", () => {
+    const raw = makeApiError(
+      "WIDGET_MISSING_FILTER",
+      "release_readiness requires plan_id",
+      400,
+    );
+    const mapped = callMapPlanningError(raw);
+    expect(mapped).toBeInstanceOf(WidgetMissingFilterError);
+    expect(mapped.name).toBe("WidgetMissingFilterError");
+    expect(mapped.code).toBe("WIDGET_MISSING_FILTER");
+    expect(mapped.status).toBe(400);
+    expect(mapped.message).toBe("release_readiness requires plan_id");
+  });
+
+  it("WidgetMissingFilterError is an ApiError", () => {
+    const raw = makeApiError("WIDGET_MISSING_FILTER", "missing filter", 400);
+    expect(callMapPlanningError(raw)).toBeInstanceOf(ApiError);
+  });
+
+  it("maps UNKNOWN_WIDGET (404) to UnknownWidgetError", () => {
+    const raw = makeApiError("UNKNOWN_WIDGET", "Widget 'nope' is not registered", 404);
+    const mapped = callMapPlanningError(raw);
+    expect(mapped).toBeInstanceOf(UnknownWidgetError);
+    expect(mapped.name).toBe("UnknownWidgetError");
+    expect(mapped.code).toBe("UNKNOWN_WIDGET");
+    expect(mapped.status).toBe(404);
+  });
+
+  it("UnknownWidgetError is an ApiError", () => {
+    const raw = makeApiError("UNKNOWN_WIDGET", "not found", 404);
+    expect(callMapPlanningError(raw)).toBeInstanceOf(ApiError);
+  });
+
+  it("re-throws unknown codes unchanged", () => {
+    const raw = makeApiError("some_other_code", "unrecognised", 400);
+    const mapped = callMapPlanningError(raw);
+    expect(mapped).toBe(raw);
+    expect(mapped).toBeInstanceOf(ApiError);
+    expect(mapped).not.toBeInstanceOf(SuiteCycleError);
+  });
+
+  it("re-throws non-ApiError errors unchanged", () => {
+    const plain = new Error("network failure");
+    try {
+      mapPlanningError(plain);
+      throw new Error("should have thrown");
+    } catch (thrown) {
+      expect(thrown).toBe(plain);
+    }
+  });
+
+  it("preserves field and hint on SuiteCycleError", () => {
+    const raw = new ApiError(422, {
+      code: "SUITE_CYCLE",
+      message: "cycle",
+      field: "parent_wombat_id",
+      hint: "ancestor path: A → B → C",
+    });
+    const mapped = callMapPlanningError(raw) as SuiteCycleError;
+    expect(mapped.field).toBe("parent_wombat_id");
+    expect(mapped.hint).toBe("ancestor path: A → B → C");
   });
 });

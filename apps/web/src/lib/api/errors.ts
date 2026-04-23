@@ -219,3 +219,107 @@ export function mapRunError(err: unknown): never {
   }
   throw err;
 }
+
+// ---------------------------------------------------------------------------
+// SP3.4 specialised error classes
+//
+// Suite-write and dashboard errors use the same inheritance pattern as SP3.3
+// run errors. All four classes forward the original status/field/hint from the
+// raw ApiError so upstream error-boundary code can inspect them uniformly.
+// ---------------------------------------------------------------------------
+
+/**
+ * Thrown on 422 `SUITE_CYCLE` — adding `parent_wombat_id` would create a
+ * cycle in the suite tree.
+ */
+export class SuiteCycleError extends ApiError {
+  constructor(originalError: ApiError) {
+    super(originalError.status, {
+      code: originalError.code,
+      message: originalError.message,
+      field: originalError.field,
+      hint: originalError.hint,
+    });
+    this.name = "SuiteCycleError";
+  }
+}
+
+/**
+ * Thrown on 500 `SUITE_DEPTH_LIMIT` — the suite tree has exceeded the maximum
+ * nesting depth enforced by ResolveService (currently 20 levels).
+ */
+export class SuiteDepthLimitError extends ApiError {
+  constructor(originalError: ApiError) {
+    super(originalError.status, {
+      code: originalError.code,
+      message: originalError.message,
+      field: originalError.field,
+      hint: originalError.hint,
+    });
+    this.name = "SuiteDepthLimitError";
+  }
+}
+
+/**
+ * Thrown on 400 `WIDGET_MISSING_FILTER` — the requested widget requires a
+ * filter (e.g. `plan_id` for `release_readiness`) that was not supplied.
+ */
+export class WidgetMissingFilterError extends ApiError {
+  constructor(originalError: ApiError) {
+    super(originalError.status, {
+      code: originalError.code,
+      message: originalError.message,
+      field: originalError.field,
+      hint: originalError.hint,
+    });
+    this.name = "WidgetMissingFilterError";
+  }
+}
+
+/**
+ * Thrown on 404 when `GET /dashboards/widget/{slug}` returns no registered
+ * widget for the given slug.
+ */
+export class UnknownWidgetError extends ApiError {
+  constructor(originalError: ApiError) {
+    super(originalError.status, {
+      code: originalError.code,
+      message: originalError.message,
+      field: originalError.field,
+      hint: originalError.hint,
+    });
+    this.name = "UnknownWidgetError";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// mapPlanningError — maps a raw ApiError into one of the SP3.4 subclasses
+// based on error.code (and status for UnknownWidgetError which uses 404).
+// Non-planning errors are re-thrown unchanged.
+// ---------------------------------------------------------------------------
+
+const PLANNING_CODE_MAP: Record<string, (err: ApiError) => ApiError> = {
+  SUITE_CYCLE: (err) => new SuiteCycleError(err),
+  SUITE_DEPTH_LIMIT: (err) => new SuiteDepthLimitError(err),
+  WIDGET_MISSING_FILTER: (err) => new WidgetMissingFilterError(err),
+  UNKNOWN_WIDGET: (err) => new UnknownWidgetError(err),
+};
+
+/**
+ * Maps a raw error thrown by the API client into a specialised SP3.4 planning
+ * error where applicable. Non-planning errors are re-thrown unchanged.
+ *
+ * Usage:
+ * ```ts
+ * try { await api.GET(...) } catch (e) { mapPlanningError(e) }
+ * ```
+ */
+export function mapPlanningError(err: unknown): never {
+  if (err instanceof ApiError) {
+    const factory = PLANNING_CODE_MAP[err.code];
+    if (factory) {
+      throw factory(err);
+    }
+  }
+  throw err;
+}
