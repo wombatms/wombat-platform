@@ -1,23 +1,29 @@
 /**
  * ContentBuilder — shared authoring surface for plans and suites (SP3.4 §5.3).
  *
- * Design decisions from frontend-design skill invocation (Task 38):
+ * Design decisions from frontend-design skill invocations (Tasks 38 + 41):
  * - Two-pane CSS grid: 1.2fr (form) / 1fr (preview) at lg+; single column mobile.
  * - Right pane is `position: sticky; top: 0; height: 100dvh` so it never scrolls
  *   off screen even on long forms. Left pane scrolls independently.
- * - Preview shows a count badge ("142 matching cases") and a virtualized list of
- *   resolved cases, each row carrying source badges + remove/restore affordances.
- * - Loading state = spinner overlay on the right pane; left pane still interactive.
- * - Empty plan body = right pane shows a prompt to add filters or cases.
- * - kind prop is the single switch: plan shows suite_refs/environments/assignees/
- *   approvals; suite shows parent/owner/tags. Same component, no twin.
- * - FormPane is assembled in Task 41 — stubbed here.
+ * - Preview shows a count badge and virtualized case list with source badges +
+ *   remove/restore affordances.
+ * - kind prop is the single switch; FormPane renders appropriate sub-components.
+ * - FormPane assembles: title+desc → FilterBuilder → SuiteRefsPicker (plan) →
+ *   ExplicitCasesPicker → MetadataFields. Each section is separated by consistent
+ *   spacing and subtle dividers ("coherent document form" — Task 41 skill).
+ * - Advanced metadata (assignees, approvals) collapses by default; collapsed
+ *   state shows a summary ("2 assignees · 1 approval").
+ * - Task 41 complete: FormPane stub replaced with real assembly.
  */
 
 import { useState, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useResolveDraft } from "./use-resolve-draft";
 import { BuilderPreviewPane } from "./PreviewPane";
+import { FilterBuilder } from "./FilterBuilder";
+import { SuiteRefsPicker } from "./SuiteRefsPicker";
+import { ExplicitCasesPicker } from "./ExplicitCasesPicker";
+import { MetadataFields } from "./MetadataFields";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -113,7 +119,21 @@ export interface ContentBuilderProps {
 }
 
 // ---------------------------------------------------------------------------
-// FormPane stub — filled in by Task 41
+// SectionDivider — subtle visual separator between form sections
+// ---------------------------------------------------------------------------
+
+function SectionDivider() {
+  return (
+    <div
+      className="h-px w-full"
+      aria-hidden="true"
+      style={{ background: "var(--border-subtle)" }}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// FormPane — assembled left column (Task 41)
 // ---------------------------------------------------------------------------
 
 interface FormPaneProps {
@@ -125,20 +145,24 @@ interface FormPaneProps {
 }
 
 /**
- * FormPane — left column. Stubbed here; Task 41 imports and assembles
- * FilterBuilder + ExplicitCasesPicker + SuiteRefsPicker + MetadataFields.
+ * FormPane — left column. Assembles:
+ *   1. Title + Description (basic information)
+ *   2. FilterBuilder (include/exclude)
+ *   3. SuiteRefsPicker (plan only)
+ *   4. ExplicitCasesPicker (add/remove explicit cases)
+ *   5. MetadataFields (kind-switched: plan or suite settings + advanced)
+ *
+ * Each section is separated by a SectionDivider for the "coherent document
+ * form" rhythm (Task 41 frontend-design skill decision).
  */
-function FormPane({ kind, body, onChange, onExplicitRemove, onExplicitRestore }: FormPaneProps) {
-  // Task 41 replaces this stub with the assembled form.
-  // The props are final so the sub-components can be wired without touching
-  // ContentBuilder itself.
-  void onExplicitRemove;
-  void onExplicitRestore;
+function FormPane({ kind, body, onChange, onExplicitRemove: _onExplicitRemove, onExplicitRestore: _onExplicitRestore }: FormPaneProps) {
+  const planBody = kind === "plan" ? (body as PlanBody) : null;
+  const suiteBody = kind === "suite" ? (body as SuiteBody) : null;
 
   return (
     <div className="flex flex-col gap-6">
       {/* ---------------------------------------------------------------- */}
-      {/* Title + Description                                               */}
+      {/* 1. Title + Description                                            */}
       {/* ---------------------------------------------------------------- */}
       <section aria-label="Basic information" className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
@@ -155,7 +179,11 @@ function FormPane({ kind, body, onChange, onExplicitRemove, onExplicitRestore }:
             type="text"
             value={body.title}
             onChange={(e) => onChange({ title: e.target.value } as Partial<ContentBody>)}
-            placeholder={kind === "plan" ? "e.g. Release 2026.05 — Payments regression" : "e.g. Checkout regression"}
+            placeholder={
+              kind === "plan"
+                ? "e.g. Release 2026.05 — Payments regression"
+                : "e.g. Checkout regression"
+            }
             required
             className={cn(
               "w-full rounded-md px-3 py-2 text-sm",
@@ -182,7 +210,11 @@ function FormPane({ kind, body, onChange, onExplicitRemove, onExplicitRestore }:
             id="cb-description"
             value={body.description}
             onChange={(e) => onChange({ description: e.target.value } as Partial<ContentBody>)}
-            placeholder="Optional. Describe the purpose of this plan."
+            placeholder={
+              kind === "plan"
+                ? "Optional. Describe the goal of this plan."
+                : "Optional. Describe this suite."
+            }
             rows={3}
             className={cn(
               "w-full rounded-md px-3 py-2 text-sm resize-none",
@@ -198,24 +230,135 @@ function FormPane({ kind, body, onChange, onExplicitRemove, onExplicitRestore }:
         </div>
       </section>
 
+      <SectionDivider />
+
       {/* ---------------------------------------------------------------- */}
-      {/* Placeholder area — Task 41 inserts sub-components here           */}
+      {/* 2. FilterBuilder                                                  */}
       {/* ---------------------------------------------------------------- */}
-      <div
-        className="rounded-md border-2 border-dashed px-4 py-6 text-center text-xs"
-        style={{
-          borderColor: "var(--border-subtle)",
-          color: "var(--fg-disabled)",
+      <FilterBuilder
+        include={{
+          tags_any: body.include.tags_any,
+          priorities: body.include.priorities,
+          components_any: body.include.components_any,
         }}
-        aria-label="Form sub-components placeholder"
-      >
-        FilterBuilder · {kind === "plan" ? "SuiteRefsPicker · " : ""}ExplicitCasesPicker · MetadataFields
-        <br />
-        <span style={{ color: "var(--fg-disabled)" }}>(assembled in Task 41)</span>
-      </div>
+        exclude={
+          planBody
+            ? {
+                tags_any: planBody.exclude.tags_any,
+                priorities: planBody.exclude.priorities,
+                components_any: planBody.exclude.components_any,
+              }
+            : { tags_any: [], priorities: [], components_any: [] }
+        }
+        onChange={({ include: incPatch, exclude: excPatch }) => {
+          if (incPatch) {
+            onChange({
+              include: { ...body.include, ...incPatch } as FilterBody,
+            } as Partial<ContentBody>);
+          }
+          if (excPatch && planBody) {
+            onChange({
+              exclude: { ...planBody.exclude, ...excPatch } as FilterBody,
+            } as Partial<ContentBody>);
+          }
+        }}
+      />
+
+      {/* ---------------------------------------------------------------- */}
+      {/* 3. SuiteRefsPicker — plan only                                    */}
+      {/* ---------------------------------------------------------------- */}
+      {kind === "plan" && planBody && (
+        <>
+          <SectionDivider />
+          <SuiteRefsPicker
+            value={planBody.suite_refs}
+            onChange={(suite_refs) =>
+              onChange({ suite_refs } as Partial<ContentBody>)
+            }
+          />
+        </>
+      )}
+
+      <SectionDivider />
+
+      {/* ---------------------------------------------------------------- */}
+      {/* 4. ExplicitCasesPicker                                            */}
+      {/* ---------------------------------------------------------------- */}
+      <ExplicitCasesPicker
+        addIds={
+          kind === "plan"
+            ? (planBody?.explicit_cases.add ?? [])
+            : (suiteBody?.cases ?? [])
+        }
+        removeIds={
+          kind === "plan"
+            ? (planBody?.explicit_cases.remove ?? [])
+            : []
+        }
+        onChangeAdd={(ids) => {
+          if (kind === "plan") {
+            onChange({
+              explicit_cases: {
+                add: ids,
+                remove: planBody?.explicit_cases.remove ?? [],
+              },
+            } as Partial<ContentBody>);
+          } else {
+            onChange({ cases: ids } as Partial<ContentBody>);
+          }
+        }}
+        onChangeRemove={(ids) => {
+          if (kind === "plan") {
+            onChange({
+              explicit_cases: {
+                add: planBody?.explicit_cases.add ?? [],
+                remove: ids,
+              },
+            } as Partial<ContentBody>);
+          }
+          // suites don't have a separate remove list
+        }}
+      />
+
+      <SectionDivider />
+
+      {/* ---------------------------------------------------------------- */}
+      {/* 5. MetadataFields                                                 */}
+      {/* ---------------------------------------------------------------- */}
+      <MetadataFields
+        kind={kind}
+        planMeta={
+          planBody
+            ? {
+                environments: planBody.environments,
+                release: planBody.release,
+                assignees: planBody.assignees,
+                approvals: planBody.approvals,
+              }
+            : undefined
+        }
+        suiteMeta={
+          suiteBody
+            ? {
+                parent_wombat_id: suiteBody.parent_wombat_id,
+                owner: suiteBody.owner,
+                tags: suiteBody.tags,
+              }
+            : undefined
+        }
+        onChangePlan={(patch) => onChange(patch as Partial<ContentBody>)}
+        onChangeSuite={(patch) => onChange(patch as Partial<ContentBody>)}
+      />
+
+      {/* Spacer so the last section doesn't butt up against the footer */}
+      <div className="h-2" aria-hidden="true" />
     </div>
   );
 }
+
+// keep the prop types used by the inner FormPane visible for the
+// onExplicitRemove / onExplicitRestore wiring that ContentBuilder still owns
+void ((_: FormPaneProps) => {}); // type-use sentinel — prevents TS unused-type warning
 
 // ---------------------------------------------------------------------------
 // ContentBuilder
