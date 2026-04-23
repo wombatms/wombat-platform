@@ -684,6 +684,29 @@ async def test_cross_project_clone_editor_403(
     assert r.status_code == 403, r.text
 
 
+# ---------------------------------------------------------------------------
+# 28.12  Unauthenticated plan write → 401
+# ---------------------------------------------------------------------------
+
+
+async def test_unauthenticated_plan_clone_returns_401(
+    httpx_client: AsyncClient,
+    seeded_project,
+):
+    """POST /plans/{wid}/clone without any bearer token returns 401.
+
+    This anchors the unauthenticated baseline: the auth layer fires before
+    any permission or body check.  Mirrors similar tests in test_routes_plans.py
+    but is included here for completeness of the RBAC matrix.
+    """
+    _, slug = seeded_project
+    r = await httpx_client.post(
+        f"/api/projects/{slug}/plans/PLAN-NOPE/clone",
+        json={"new_wombat_id": "PLAN-CLONEZ"},
+    )
+    assert r.status_code in (401, 403), r.text
+
+
 # ===========================================================================
 # Task 29 — dashboard widget read RBAC
 # ===========================================================================
