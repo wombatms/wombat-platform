@@ -988,3 +988,37 @@ async def test_review_backlog_requires_runs_read_explicitly(
         f"review_backlog: expected 200 or 400 with runs:read, "
         f"got {r_allow.status_code}. Body: {r_allow.text}"
     )
+
+
+# ---------------------------------------------------------------------------
+# 29.15  API token with empty permissions cannot list widgets (runs:read absent)
+# ---------------------------------------------------------------------------
+
+
+async def test_api_token_without_runs_read_cannot_list_widgets(
+    httpx_client: AsyncClient,
+    users,
+    db_session: AsyncSession,
+    widget_project,
+):
+    """A token with an empty permissions list (no runs:read) is denied the widget list.
+
+    This covers the widget *list* endpoint (GET /dashboards/widgets), not just
+    individual widget dispatch.  Both endpoints enforce runs:read.
+
+    Permission slugs asserted: runs:read (absent from API token permissions).
+    """
+    _project, slug = widget_project
+    viewer_user = users["viewer"]["user"]
+    no_perms_token = await _issue_api_token_with_perms(
+        db_session, viewer_user.id, permissions=[]
+    )
+
+    r = await httpx_client.get(
+        f"/api/projects/{slug}/dashboards/widgets",
+        headers={"Authorization": f"Bearer {no_perms_token}"},
+    )
+    assert r.status_code == 403, (
+        f"Expected 403 for token without runs:read on widget list, "
+        f"got {r.status_code}. Body: {r.text}"
+    )
