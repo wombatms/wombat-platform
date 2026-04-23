@@ -1,15 +1,21 @@
-"""Integration tests for the 6 new SP3.3 MCP tools.
+"""Integration tests for the MCP tools (SP3.3 + SP3.4).
 
 Strategy: all HTTP calls are mocked with respx so no live server is required.
 Each tool gets one happy-path test and one error-path test.
 
-Tools under test:
+SP3.3 tools under test:
   create_run       — POST /api/projects/{slug}/runs
   list_runs        — GET  /api/projects/{slug}/runs
   get_run          — GET  /api/projects/{slug}/runs/{run_id}
   record_result    — POST /api/projects/{slug}/runs/{run_id}/results (single + batch)
   attach_evidence  — POST /api/projects/{slug}/runs/{run_id}/results/{case_id}/evidence
   close_run        — POST /api/projects/{slug}/runs/{run_id}/close
+
+SP3.4 tools under test:
+  save_plan            — POST /api/{slug}/proposals  (kind=plan)
+  save_suite           — POST /api/{slug}/proposals  (kind=suite)
+  resolve_plan         — POST /api/{slug}/content/resolve  OR  GET /api/{slug}/plans/{wid}/resolve
+  get_dashboard_widget — GET  /api/{slug}/dashboards/widget/{widget_slug}
 """
 
 from __future__ import annotations
@@ -93,22 +99,34 @@ def test_sp33_tools_registered_in_api_mode():
     assert not missing, f"Missing SP3.3 tools: {missing}"
 
 
-def test_api_mode_has_26_tools():
-    """API mode has 26 tools after SP3.3 additions."""
+def test_sp34_tools_registered_in_api_mode():
+    """All 4 SP3.4 tools are present in api mode."""
+    from wombat_mcp.tools import build_tool_registry
+
+    registry = build_tool_registry("api")
+    names = {t.name for t in registry.tool_definitions()}
+
+    sp34_names = {"save_plan", "save_suite", "resolve_plan", "get_dashboard_widget"}
+    missing = sp34_names - names
+    assert not missing, f"Missing SP3.4 tools: {missing}"
+
+
+def test_api_mode_has_30_tools():
+    """API mode has 30 tools after SP3.3 + SP3.4 additions."""
     from wombat_mcp.tools import build_tool_registry
 
     registry = build_tool_registry("api")
     tools = registry.tool_definitions()
-    assert len(tools) == 26, f"Expected 26, got {len(tools)}: {[t.name for t in tools]}"
+    assert len(tools) == 30, f"Expected 30, got {len(tools)}: {[t.name for t in tools]}"
 
 
-def test_both_mode_has_31_tools():
-    """Both mode has 31 tools after SP3.3 additions."""
+def test_both_mode_has_35_tools():
+    """Both mode has 35 tools after SP3.3 + SP3.4 additions."""
     from wombat_mcp.tools import build_tool_registry
 
     registry = build_tool_registry("both")
     tools = registry.tool_definitions()
-    assert len(tools) == 31, f"Expected 31, got {len(tools)}: {[t.name for t in tools]}"
+    assert len(tools) == 35, f"Expected 35, got {len(tools)}: {[t.name for t in tools]}"
 
 
 # ---------------------------------------------------------------------------
@@ -898,3 +916,533 @@ async def test_server_close_run_already_closed_error_envelope():
     # Error text contains the HTTP status code
     error_text = result.root.content[0].text
     assert "409" in error_text or "Conflict" in error_text
+
+
+# ---------------------------------------------------------------------------
+# SP3.4 planning + dashboards tools (Task 18)
+# ---------------------------------------------------------------------------
+
+_PLAN_WID = "PLAN-PAYMENTS-001"
+_SUITE_WID = "SUITE-CHECKOUT-001"
+_ENV_ID = "dddddddd-dddd-dddd-dddd-dddddddddddd"
+_ENV_NAME = "staging"
+
+_PROPOSAL_RESPONSE = {
+    "data": {
+        "id": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+        "kind": "plan",
+        "wombat_id": _PLAN_WID,
+        "status": "open",
+        "created_at": _NOW,
+        "updated_at": _NOW,
+    }
+}
+
+_RESOLVED_PLAN_RESPONSE = {
+    "data": {
+        "cases": [
+            {"wombat_id": "TC-PAY-001", "title": "Checkout happy path"},
+            {"wombat_id": "TC-PAY-002", "title": "Payment decline"},
+        ],
+        "count": 2,
+        "by_source": {"filter": 1, "explicit": 1, "suite": 0},
+        "warnings": [],
+    }
+}
+
+_WIDGET_PASSFAIL_RESPONSE = {
+    "data": {
+        "slug": "passfail_trend",
+        "title": "Pass/Fail Trend",
+        "rows": [
+            {"date": "2026-04-15", "pass": 10, "fail": 2, "blocked": 0, "skipped": 1},
+            {"date": "2026-04-16", "pass": 12, "fail": 1, "blocked": 0, "skipped": 0},
+        ],
+    }
+}
+
+_ENVIRONMENTS_RESPONSE = {
+    "data": [
+        {"id": _ENV_ID, "name": _ENV_NAME, "created_at": _NOW},
+    ]
+}
+
+
+# --- save_plan ---
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_save_plan_happy_path():
+    """save_plan POSTs to /api/{slug}/proposals with kind=plan."""
+    from wombat_mcp.tools.api import _sp34_save_plan
+
+    route = respx.post(f"{_BASE_URL}/api/{_PROJECT}/proposals").mock(
+        return_value=httpx.Response(201, json=_PROPOSAL_RESPONSE)
+    )
+
+    plan_body = {
+        "id": _PLAN_WID,
+        "title": "Payments regression — Release 2026.05",
+        "include": {"tags": ["payments"], "priority": "P1"},
+        "explicit_cases": {"add": [], "remove": []},
+        "suite_refs": [],
+    }
+
+    result = await _sp34_save_plan(
+        {
+            "project_slug": _PROJECT,
+            "plan_body": plan_body,
+        }
+    )
+
+    assert route.called
+    req = json.loads(route.calls[0].request.content)
+    assert req["kind"] == "plan"
+    assert req["wombat_id"] == _PLAN_WID
+    assert req["body"] == plan_body
+    assert "base_revision" not in req
+    assert result["data"]["kind"] == "plan"
+    assert result["data"]["wombat_id"] == _PLAN_WID
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_save_plan_with_base_revision():
+    """save_plan forwards base_revision when updating an existing plan."""
+    from wombat_mcp.tools.api import _sp34_save_plan
+
+    route = respx.post(f"{_BASE_URL}/api/{_PROJECT}/proposals").mock(
+        return_value=httpx.Response(201, json=_PROPOSAL_RESPONSE)
+    )
+
+    await _sp34_save_plan(
+        {
+            "project_slug": _PROJECT,
+            "plan_body": {"id": _PLAN_WID, "title": "Updated plan"},
+            "base_revision": "abc1234",
+        }
+    )
+
+    req = json.loads(route.calls[0].request.content)
+    assert req["base_revision"] == "abc1234"
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_save_plan_error_propagates():
+    """save_plan raises on 4xx from the server."""
+    from wombat_mcp.tools.api import _sp34_save_plan
+
+    respx.post(f"{_BASE_URL}/api/{_PROJECT}/proposals").mock(
+        return_value=httpx.Response(
+            409,
+            json={"error": {"code": "open_proposal_exists", "message": "An open proposal already exists."}},
+        )
+    )
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await _sp34_save_plan(
+            {
+                "project_slug": _PROJECT,
+                "plan_body": {"id": _PLAN_WID, "title": "Duplicate plan"},
+            }
+        )
+
+
+# --- save_suite ---
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_save_suite_happy_path():
+    """save_suite POSTs to /api/{slug}/proposals with kind=suite."""
+    from wombat_mcp.tools.api import _sp34_save_suite
+
+    suite_proposal = {
+        **_PROPOSAL_RESPONSE,
+        "data": {**_PROPOSAL_RESPONSE["data"], "kind": "suite", "wombat_id": _SUITE_WID},
+    }
+    route = respx.post(f"{_BASE_URL}/api/{_PROJECT}/proposals").mock(
+        return_value=httpx.Response(201, json=suite_proposal)
+    )
+
+    suite_body = {
+        "id": _SUITE_WID,
+        "title": "Checkout regression",
+        "parent_wombat_id": None,
+        "cases": ["TC-PAY-001", "TC-PAY-002"],
+    }
+
+    result = await _sp34_save_suite(
+        {
+            "project_slug": _PROJECT,
+            "suite_body": suite_body,
+        }
+    )
+
+    assert route.called
+    req = json.loads(route.calls[0].request.content)
+    assert req["kind"] == "suite"
+    assert req["wombat_id"] == _SUITE_WID
+    assert req["body"] == suite_body
+    assert result["data"]["kind"] == "suite"
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_save_suite_with_base_revision():
+    """save_suite forwards base_revision when updating an existing suite."""
+    from wombat_mcp.tools.api import _sp34_save_suite
+
+    route = respx.post(f"{_BASE_URL}/api/{_PROJECT}/proposals").mock(
+        return_value=httpx.Response(201, json=_PROPOSAL_RESPONSE)
+    )
+
+    await _sp34_save_suite(
+        {
+            "project_slug": _PROJECT,
+            "suite_body": {"id": _SUITE_WID, "title": "Updated suite"},
+            "base_revision": "def5678",
+        }
+    )
+
+    req = json.loads(route.calls[0].request.content)
+    assert req["base_revision"] == "def5678"
+    assert req["kind"] == "suite"
+
+
+# --- resolve_plan ---
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_resolve_plan_with_body():
+    """resolve_plan POSTs to /content/resolve when plan_body is provided."""
+    from wombat_mcp.tools.api import _sp34_resolve_plan
+
+    route = respx.post(f"{_BASE_URL}/api/{_PROJECT}/content/resolve").mock(
+        return_value=httpx.Response(200, json=_RESOLVED_PLAN_RESPONSE)
+    )
+
+    plan_body = {
+        "id": _PLAN_WID,
+        "title": "Draft plan",
+        "include": {"tags": ["payments"]},
+        "explicit_cases": {"add": ["TC-PAY-002"], "remove": []},
+        "suite_refs": [],
+    }
+
+    result = await _sp34_resolve_plan(
+        {
+            "project_slug": _PROJECT,
+            "plan_body": plan_body,
+        }
+    )
+
+    assert route.called
+    req = json.loads(route.calls[0].request.content)
+    assert req["kind"] == "plan"
+    assert req["body"] == plan_body
+    assert result["data"]["count"] == 2
+    assert len(result["data"]["cases"]) == 2
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_resolve_plan_with_wombat_id():
+    """resolve_plan GETs /plans/{wid}/resolve when plan_wombat_id is provided."""
+    from wombat_mcp.tools.api import _sp34_resolve_plan
+
+    route = respx.get(f"{_BASE_URL}/api/{_PROJECT}/plans/{_PLAN_WID}/resolve").mock(
+        return_value=httpx.Response(200, json=_RESOLVED_PLAN_RESPONSE)
+    )
+
+    result = await _sp34_resolve_plan(
+        {
+            "project_slug": _PROJECT,
+            "plan_wombat_id": _PLAN_WID,
+        }
+    )
+
+    assert route.called
+    assert result["data"]["count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_resolve_plan_neither_raises():
+    """resolve_plan raises ValueError when neither plan_body nor plan_wombat_id is given."""
+    from wombat_mcp.tools.api import _sp34_resolve_plan
+
+    with pytest.raises(ValueError, match="required"):
+        await _sp34_resolve_plan({"project_slug": _PROJECT})
+
+
+@pytest.mark.asyncio
+async def test_resolve_plan_both_raises():
+    """resolve_plan raises ValueError when both plan_body and plan_wombat_id are given."""
+    from wombat_mcp.tools.api import _sp34_resolve_plan
+
+    with pytest.raises(ValueError, match="not both"):
+        await _sp34_resolve_plan(
+            {
+                "project_slug": _PROJECT,
+                "plan_body": {"id": _PLAN_WID, "title": "Draft"},
+                "plan_wombat_id": _PLAN_WID,
+            }
+        )
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_resolve_plan_error_propagates():
+    """resolve_plan raises on 4xx from the server."""
+    from wombat_mcp.tools.api import _sp34_resolve_plan
+
+    respx.post(f"{_BASE_URL}/api/{_PROJECT}/content/resolve").mock(
+        return_value=httpx.Response(
+            422,
+            json={"error": {"code": "unknown_suite_ref", "message": "Suite SUITE-X not found."}},
+        )
+    )
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await _sp34_resolve_plan(
+            {
+                "project_slug": _PROJECT,
+                "plan_body": {"id": _PLAN_WID, "suite_refs": ["SUITE-X"]},
+            }
+        )
+
+
+# --- get_dashboard_widget ---
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_get_dashboard_widget_happy_path():
+    """get_dashboard_widget GETs the widget endpoint with scope params."""
+    from wombat_mcp.tools.api import _sp34_get_dashboard_widget
+
+    route = respx.get(f"{_BASE_URL}/api/{_PROJECT}/dashboards/widget/passfail_trend").mock(
+        return_value=httpx.Response(200, json=_WIDGET_PASSFAIL_RESPONSE)
+    )
+
+    result = await _sp34_get_dashboard_widget(
+        {
+            "project_slug": _PROJECT,
+            "widget_slug": "passfail_trend",
+            "scope": "project",
+            "scope_id": _PROJECT,
+            "window": "30d",
+        }
+    )
+
+    assert route.called
+    url_str = str(route.calls[0].request.url)
+    assert "scope=project" in url_str
+    assert "window=30d" in url_str
+    assert result["data"]["slug"] == "passfail_trend"
+    assert len(result["data"]["rows"]) == 2
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_get_dashboard_widget_plan_scope():
+    """get_dashboard_widget passes plan_wombat_id as plan_id query param."""
+    from wombat_mcp.tools.api import _sp34_get_dashboard_widget
+
+    route = respx.get(f"{_BASE_URL}/api/{_PROJECT}/dashboards/widget/release_readiness").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "data": {
+                    "slug": "release_readiness",
+                    "plan_id": _PLAN_WID,
+                    "executed_pct": 78,
+                    "pass_pct": 91,
+                }
+            },
+        )
+    )
+
+    result = await _sp34_get_dashboard_widget(
+        {
+            "project_slug": _PROJECT,
+            "widget_slug": "release_readiness",
+            "scope": "project",
+            "scope_id": _PROJECT,
+            "plan_wombat_id": _PLAN_WID,
+        }
+    )
+
+    assert route.called
+    url_str = str(route.calls[0].request.url)
+    assert f"plan_id={_PLAN_WID}" in url_str
+    assert result["data"]["executed_pct"] == 78
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_get_dashboard_widget_env_name_resolved():
+    """get_dashboard_widget resolves env_name to env_id before calling the widget endpoint."""
+    from wombat_mcp.tools.api import _sp34_get_dashboard_widget
+
+    env_route = respx.get(f"{_BASE_URL}/api/{_PROJECT}/environments").mock(
+        return_value=httpx.Response(200, json=_ENVIRONMENTS_RESPONSE)
+    )
+    widget_route = respx.get(f"{_BASE_URL}/api/{_PROJECT}/dashboards/widget/passfail_trend").mock(
+        return_value=httpx.Response(200, json=_WIDGET_PASSFAIL_RESPONSE)
+    )
+
+    result = await _sp34_get_dashboard_widget(
+        {
+            "project_slug": _PROJECT,
+            "widget_slug": "passfail_trend",
+            "scope": "project",
+            "scope_id": _PROJECT,
+            "env_name": _ENV_NAME,
+        }
+    )
+
+    # Environment lookup was made.
+    assert env_route.called
+    env_url = str(env_route.calls[0].request.url)
+    assert f"name={_ENV_NAME}" in env_url
+
+    # Widget request contains resolved env_id, not env_name.
+    assert widget_route.called
+    widget_url = str(widget_route.calls[0].request.url)
+    assert f"env_id={_ENV_ID}" in widget_url
+    assert "env_name" not in widget_url
+
+    assert result["data"]["slug"] == "passfail_trend"
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_get_dashboard_widget_env_name_not_found():
+    """get_dashboard_widget raises ValueError when env_name has no match."""
+    from wombat_mcp.tools.api import _sp34_get_dashboard_widget
+
+    respx.get(f"{_BASE_URL}/api/{_PROJECT}/environments").mock(
+        return_value=httpx.Response(200, json={"data": []})
+    )
+
+    with pytest.raises(ValueError, match="no environment named"):
+        await _sp34_get_dashboard_widget(
+            {
+                "project_slug": _PROJECT,
+                "widget_slug": "passfail_trend",
+                "scope": "project",
+                "scope_id": _PROJECT,
+                "env_name": "nonexistent-env",
+            }
+        )
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_get_dashboard_widget_error_propagates():
+    """get_dashboard_widget raises on 4xx from the server."""
+    from wombat_mcp.tools.api import _sp34_get_dashboard_widget
+
+    respx.get(f"{_BASE_URL}/api/{_PROJECT}/dashboards/widget/release_readiness").mock(
+        return_value=httpx.Response(
+            400,
+            json={"error": {"code": "WIDGET_MISSING_FILTER", "message": "plan_id is required for release_readiness on project scope."}},
+        )
+    )
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await _sp34_get_dashboard_widget(
+            {
+                "project_slug": _PROJECT,
+                "widget_slug": "release_readiness",
+                "scope": "project",
+                "scope_id": _PROJECT,
+                # plan_wombat_id intentionally omitted to trigger the error
+            }
+        )
+
+
+# --- Registry dispatch for SP3.4 tools ---
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_registry_dispatches_save_plan():
+    """ToolRegistry.call correctly dispatches 'save_plan'."""
+    from wombat_mcp.tools import build_tool_registry
+
+    registry = build_tool_registry("api")
+
+    respx.post(f"{_BASE_URL}/api/{_PROJECT}/proposals").mock(
+        return_value=httpx.Response(201, json=_PROPOSAL_RESPONSE)
+    )
+
+    result = await registry.call(
+        "save_plan",
+        {
+            "project_slug": _PROJECT,
+            "plan_body": {"id": _PLAN_WID, "title": "Regression plan"},
+        },
+    )
+
+    assert isinstance(result, dict)
+    assert result["data"]["wombat_id"] == _PLAN_WID
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_registry_dispatches_resolve_plan():
+    """ToolRegistry.call correctly dispatches 'resolve_plan' (body variant)."""
+    from wombat_mcp.tools import build_tool_registry
+
+    registry = build_tool_registry("api")
+
+    respx.post(f"{_BASE_URL}/api/{_PROJECT}/content/resolve").mock(
+        return_value=httpx.Response(200, json=_RESOLVED_PLAN_RESPONSE)
+    )
+
+    result = await registry.call(
+        "resolve_plan",
+        {
+            "project_slug": _PROJECT,
+            "plan_body": {"id": _PLAN_WID, "include": {"tags": ["payments"]}},
+        },
+    )
+
+    assert result["data"]["count"] == 2
+
+
+@respx.mock
+@pytest.mark.asyncio
+async def test_registry_dispatches_get_dashboard_widget():
+    """ToolRegistry.call correctly dispatches 'get_dashboard_widget'."""
+    from wombat_mcp.tools import build_tool_registry
+
+    registry = build_tool_registry("api")
+
+    respx.get(f"{_BASE_URL}/api/{_PROJECT}/dashboards/widget/recent_runs").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "data": {
+                    "slug": "recent_runs",
+                    "runs": [],
+                }
+            },
+        )
+    )
+
+    result = await registry.call(
+        "get_dashboard_widget",
+        {
+            "project_slug": _PROJECT,
+            "widget_slug": "recent_runs",
+            "scope": "project",
+        },
+    )
+
+    assert result["data"]["slug"] == "recent_runs"
