@@ -474,3 +474,165 @@ async def test_draft_plan_resolve_combined_filter_and_explicit_add(
     assert f"{prefix}-F1" in wids, "filter case should be included"
     assert f"{prefix}-EXTRA" in wids, "explicit add should be included"
     assert f"{prefix}-F2" not in wids, "explicit remove should be excluded"
+
+
+# ===========================================================================
+# Task 24: Draft semantics parity + warnings contract (SP3.4)
+# ===========================================================================
+
+
+@pytest.mark.asyncio
+async def test_draft_resolve_matches_saved_plan_resolve(
+    httpx_client: AsyncClient,
+    db_session: AsyncSession,
+    seeded_project,
+    users,
+):
+    """Draft /content/resolve and GET /plans/{wid}/resolve return identical case sets
+    when called with the same plan body.
+
+    This is the core parity contract: the draft-preview endpoint must be a perfect
+    mirror of the persisted-plan resolution path.
+    """
+    from wombat_api.database.models import Content
+
+    project, slug = seeded_project
+    token = users["editor"]["token"]
+
+    # Seed 3 testcases with tag "api-parity".
+    prefix = f"TC-PARITY-{_uid()}"
+    await _seed_testcases(
+        db_session,
+        project.id,
+        [
+            {"wombat_id": f"{prefix}-1", "tags": ["api-parity"]},
+            {"wombat_id": f"{prefix}-2", "tags": ["api-parity"]},
+            {"wombat_id": f"{prefix}-3", "tags": ["other"]},  # must be excluded
+        ],
+    )
+
+    plan_body = {
+        "title": "Parity plan",
+        "include": {"tags_any": ["api-parity"]},
+        "exclude": {},
+        "suite_refs": [],
+        "explicit_cases": {"add": [], "remove": []},
+    }
+
+    # 1. Draft resolve (POST /content/resolve).
+    draft_r = await httpx_client.post(
+        f"/api/projects/{slug}/content/resolve",
+        json={"kind": "plan", "body": plan_body},
+        headers=_auth(token),
+    )
+    assert draft_r.status_code == 200, draft_r.text
+    draft_wids = {c["wombat_id"] for c in draft_r.json()["cases"]}
+
+    # 2. Persist the plan as a content row (simulate published plan).
+    plan_wid = f"PLAN-PARITY-{_uid()}"
+    row = Content(
+        project_id=project.id,
+        kind="plan",
+        wombat_id=plan_wid,
+        title="Parity plan",
+        tags=[],
+        body={**plan_body, "id": plan_wid},
+        source_repo="test-repo",
+        source_path=f"plans/{plan_wid}.md",
+        source_revision="abc123",
+        content_hash=f"hash-{plan_wid}-{uuid.uuid4().hex[:6]}",
+    )
+    db_session.add(row)
+    await db_session.commit()
+
+    # 3. Saved plan resolve (GET /plans/{wid}/resolve).
+    saved_r = await httpx_client.get(
+        f"/api/projects/{slug}/plans/{plan_wid}/resolve",
+        headers=_auth(token),
+    )
+    assert saved_r.status_code == 200, saved_r.text
+    saved_wids = {c["wombat_id"] for c in saved_r.json()["data"]["cases"]}
+
+    # Both must return the same set of cases.
+    assert draft_wids == saved_wids, (
+        f"Draft resolve ({draft_wids}) differs from saved-plan resolve ({saved_wids})"
+    )
+    assert f"{prefix}-1" in draft_wids
+    assert f"{prefix}-2" in draft_wids
+    assert f"{prefix}-3" not in draft_wids, "Non-matching case must not appear"
+
+
+@pytest.mark.asyncio
+async def test_both_unknown_warnings_in_same_request(
+    httpx_client: AsyncClient,
+    db_session: AsyncSession,
+    seeded_project,
+    users,
+):
+    """Both UNKNOWN_SUITE_REF and UNKNOWN_CASE_ID appear in the same response (no error)."""
+    _, slug = seeded_project
+    token = users["editor"]["token"]
+
+    r = await httpx_client.post(
+        f"/api/projects/{slug}/content/resolve",
+        json={
+            "kind": "plan",
+            "body": {
+                "title": "Double warn",
+                "include": {},
+                "exclude": {},
+                "suite_refs": ["SUITE-MISSING-XYZ"],
+                "explicit_cases": {"add": ["TC-MISSING-XYZ"], "remove": []},
+            },
+        },
+        headers=_auth(token),
+    )
+    assert r.status_code == 200, r.text
+    data = r.json()
+    warning_codes = {w["code"] for w in data.get("warnings", [])}
+    assert "UNKNOWN_SUITE_REF" in warning_codes
+    assert "UNKNOWN_CASE_ID" in warning_codes
+    # No error — HTTP 200 and empty cases are correct behavior.
+    assert data["cases"] == []
+
+
+@pytest.mark.asyncio
+async def test_draft_resolve_plan_kind_is_exact_literal(
+    httpx_client: AsyncClient,
+    seeded_project,
+    users,
+):
+    """kind='PLAN' (uppercase) is not accepted; only 'plan' (lowercase) is valid."""
+    _, slug = seeded_project
+    token = users["editor"]["token"]
+
+    r = await httpx_client.post(
+        f"/api/projects/{slug}/content/resolve",
+        json={
+            "kind": "PLAN",  # uppercase → invalid
+            "body": {"title": "X", "include": {}, "suite_refs": [], "explicit_cases": {"add": [], "remove": []}},
+        },
+        headers=_auth(token),
+    )
+    assert r.status_code == 422, r.text
+
+
+@pytest.mark.asyncio
+async def test_draft_resolve_empty_body_returns_empty_not_error(
+    httpx_client: AsyncClient,
+    seeded_project,
+    users,
+):
+    """kind='plan' with an entirely empty body dict resolves to empty (no crash)."""
+    _, slug = seeded_project
+    token = users["viewer"]["token"]
+
+    r = await httpx_client.post(
+        f"/api/projects/{slug}/content/resolve",
+        json={"kind": "plan", "body": {}},
+        headers=_auth(token),
+    )
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["cases"] == []
+    assert data["count"] == 0
