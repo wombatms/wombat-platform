@@ -15,6 +15,7 @@ import { useDensity } from "@/lib/density/useDensity";
 import { usePreview } from "@/lib/preview/usePreview";
 import { useTestcaseList, type Testcase } from "./useTestcaseList";
 import { testcaseColumns } from "./columns";
+import { LibrarySuitesSection, useLibrarySuiteFilter } from "./LibrarySuitesSection";
 import { cn } from "@/lib/utils";
 
 const FACET_FIELDS = ["component", "tag", "priority", "automation"];
@@ -297,7 +298,17 @@ export function LibraryPage() {
     { q, component, tag },
   );
 
-  const rows = data?.data ?? [];
+  // Suite filter — client-side strategy (a): see LibrarySuitesSection.tsx for rationale
+  const { caseIds: suiteFilterIds } = useLibrarySuiteFilter(projectSlug);
+
+  const allRows = data?.data ?? [];
+  // Apply suite filter when active: keep only rows whose wombat_id is in the
+  // resolved suite case list. While the resolve query is still loading
+  // (caseIds === null but activeSuiteRef is set), show the unfiltered list so
+  // the page doesn't blank out momentarily.
+  const rows = suiteFilterIds !== null
+    ? allRows.filter((r) => suiteFilterIds.has(r.wombat_id))
+    : allRows;
   const total = data?.total ?? 0;
 
   // Keyboard: `p` toggles preview, `/` focuses search, `d` toggles density
@@ -425,6 +436,9 @@ export function LibraryPage() {
         density={density}
         className="border-b border-[color:var(--border-default)]"
       />
+
+      {/* Suites tree filter — collapsed by default, appends ?suite_ref= to URL */}
+      <LibrarySuitesSection projectSlug={projectSlug} />
 
       {/* Bulk action toolbar — only shown when rows are checked */}
       <BulkToolbar
