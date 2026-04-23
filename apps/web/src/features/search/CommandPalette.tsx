@@ -1,3 +1,28 @@
+/**
+ * CommandPalette — ⌘K command + search overlay.
+ *
+ * SP3.4 additions (Task 54, frontend-design skill):
+ *   - New "Plans & Suites" command group with 6 actions:
+ *       New plan, New suite, Open dashboard, Open plans, Open suites,
+ *       Resolve plan… (typeahead sub-prompt)
+ *   - New PaletteMode "resolve-plan" mirrors the existing "jump-to-run"
+ *     two-step pattern: selecting the command enters a sub-mode; typing
+ *     filters usePlansList results; pressing Enter navigates to the plan
+ *     detail page.
+ *
+ * Design decisions (frontend-design skill, Task 54):
+ *   - "Plans & Suites" group uses ClipboardList (plan) + Layers (suite) icons.
+ *   - Accent token var(--chart-cat-3) (warm amber) for plan items —
+ *     same token used on the PlanContextStrip in RunCreatePage so the
+ *     visual language is consistent.
+ *   - Suite items use var(--chart-cat-2) (teal/cyan) for distinction.
+ *   - The "resolve-plan" sub-mode renders an immediate list (no min-2-chars
+ *     guard) since plans are bounded; falls back to debounced filter for
+ *     large project counts.
+ *   - Group heading style, item padding, kbd hints, and ActionHint reuse
+ *     the existing patterns verbatim.
+ */
+
 import { type RefObject, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Command } from "cmdk";
@@ -10,11 +35,15 @@ import {
   PlayCircle,
   Rocket,
   MoveRight,
+  ClipboardList,
+  Layers,
+  LayoutDashboard,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSearch, type SearchHit } from "./useSearch";
 import { runKeys } from "@/features/runs/queryKeys";
 import type { RunSummary, RunListPage } from "@/features/runs/hooks/runs";
+import { usePlansList, type PlanSummary } from "@/features/plans/hooks";
 import { api } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 
@@ -57,10 +86,12 @@ const GROUP_LABEL: Record<string, string> = {
 /* ------------------------------------------------------------------ */
 
 /**
- * "default" — shows static action commands + search results.
- * "jump-to-run" — shows a debounced run title search sub-prompt.
+ * "default"      — shows static action commands + search results.
+ * "jump-to-run"  — shows a debounced run title search sub-prompt.
+ * "resolve-plan" — shows a plan typeahead sub-prompt; selecting navigates
+ *                  to the plan detail page (which shows resolved cases).
  */
-type PaletteMode = "default" | "jump-to-run";
+type PaletteMode = "default" | "jump-to-run" | "resolve-plan";
 
 /* ------------------------------------------------------------------ */
 /* CommandPalette                                                       */
@@ -84,6 +115,19 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const [latestRunLoading, setLatestRunLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // SP3.4 — Plans list for "resolve-plan" sub-mode.
+  // Passing an empty slug when not in resolve-plan mode disables the query
+  // (usePlansList has `enabled: Boolean(slug)`), preventing unnecessary
+  // background fetches while the palette is open in other modes.
+  const {
+    data: allPlans = [],
+    isLoading: plansLoading,
+  } = usePlansList(
+    mode === "resolve-plan" ? projectSlug : "",
+    // Pass a live filter when enough chars typed; show all plans otherwise.
+    debouncedQuery.length >= 2 ? { q: debouncedQuery } : {},
+  );
+
   // Debounce 150ms
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(inputValue), 150);
@@ -101,6 +145,11 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
       setRunResults([]);
     }
   }, [open]);
+
+  // SP3.4 — "resolve-plan" sub-mode is only active (query enabled) while in that mode.
+  // usePlansList is always called (hooks rule) but the `enabled` guard inside the hook
+  // prevents a fetch when projectSlug is empty.  Client-side filtering is good enough
+  // for typical plan counts (<200); the debounced `q` param handles larger sets.
 
   // Fetch run search results when in jump-to-run mode
   useEffect(() => {
@@ -211,12 +260,58 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     requestAnimationFrame(() => inputRef.current?.focus());
   };
 
+  // SP3.4 — Plans & Suites action handlers
+
+  const handleEnterResolvePlan = () => {
+    setMode("resolve-plan");
+    setInputValue("");
+    setDebouncedQuery("");
+  };
+
+  const handleSelectPlan = (plan: PlanSummary) => {
+    if (!projectSlug) return;
+    navigate(`/p/${projectSlug}/plans/${plan.wombat_id}`);
+    onClose();
+  };
+
+  const handleNewPlan = () => {
+    if (!projectSlug) return;
+    navigate(`/p/${projectSlug}/plans/new`);
+    onClose();
+  };
+
+  const handleNewSuite = () => {
+    if (!projectSlug) return;
+    navigate(`/p/${projectSlug}/suites/new`);
+    onClose();
+  };
+
+  const handleOpenDashboard = () => {
+    if (!projectSlug) return;
+    navigate(`/p/${projectSlug}`);
+    onClose();
+  };
+
+  const handleOpenPlans = () => {
+    if (!projectSlug) return;
+    navigate(`/p/${projectSlug}/plans`);
+    onClose();
+  };
+
+  const handleOpenSuites = () => {
+    if (!projectSlug) return;
+    navigate(`/p/${projectSlug}/suites`);
+    onClose();
+  };
+
   if (!open) return null;
 
   const placeholder =
     mode === "jump-to-run"
       ? "Type a run title to search…"
-      : "Search testcases, shared steps, stories…";
+      : mode === "resolve-plan"
+        ? "Search plans…"
+        : "Search testcases, shared steps, stories…";
 
   return (
     <>
@@ -264,7 +359,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             className="flex items-center gap-2 px-4 border-b"
             style={{ borderColor: "var(--border-default)", height: 48 }}
           >
-            {mode === "jump-to-run" ? (
+            {mode === "jump-to-run" || mode === "resolve-plan" ? (
               <button
                 type="button"
                 aria-label="Back to commands"
@@ -298,6 +393,19 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
               </span>
             )}
 
+            {mode === "resolve-plan" && (
+              <span
+                className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide"
+                style={{
+                  background: "color-mix(in srgb, var(--chart-cat-3, #d97706) 12%, var(--bg-surface-3))",
+                  color: "var(--chart-cat-3, #d97706)",
+                  border: "1px solid color-mix(in srgb, var(--chart-cat-3, #d97706) 25%, var(--border-default))",
+                }}
+              >
+                Resolve plan
+              </span>
+            )}
+
             <Command.Input
               ref={inputRef as RefObject<HTMLInputElement>}
               value={inputValue}
@@ -310,7 +418,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
               style={{ color: "var(--fg-default)" }}
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
-                  if (mode === "jump-to-run") {
+                  if (mode === "jump-to-run" || mode === "resolve-plan") {
                     handleBack();
                   } else {
                     onClose();
@@ -346,8 +454,71 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             className="overflow-y-auto"
             style={{ maxHeight: "min(420px, 60vh)" }}
           >
-            {/* ---- JUMP-TO-RUN mode ---- */}
-            {mode === "jump-to-run" ? (
+            {/* ---- RESOLVE-PLAN mode (SP3.4) ---- */}
+            {mode === "resolve-plan" ? (
+              plansLoading ? (
+                <RunResultsSkeleton />
+              ) : allPlans.length === 0 ? (
+                <Command.Empty>
+                  <div className="py-10 text-center">
+                    <p
+                      className="text-[13px]"
+                      style={{ color: "var(--fg-muted)" }}
+                    >
+                      {debouncedQuery.length >= 2
+                        ? `No plans match “${debouncedQuery}”`
+                        : "No plans in this project"}
+                    </p>
+                  </div>
+                </Command.Empty>
+              ) : (
+                <div className="p-2">
+                  <Command.Group
+                    heading={
+                      <span
+                        className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider block"
+                        style={{ color: "var(--fg-muted)" }}
+                      >
+                        Plans
+                      </span>
+                    }
+                  >
+                    {allPlans.map((plan) => (
+                      <Command.Item
+                        key={plan.wombat_id}
+                        value={`plan ${plan.wombat_id} ${plan.title}`}
+                        onSelect={() => handleSelectPlan(plan)}
+                        className={cn(
+                          "flex items-center gap-2.5 rounded-md px-3 py-2.5 cursor-pointer",
+                          "transition-colors duration-80 outline-none",
+                          "data-[selected=true]:bg-[color:var(--accent-soft)]",
+                        )}
+                        style={{ color: "var(--fg-default)" }}
+                      >
+                        <ClipboardList
+                          className="h-3.5 w-3.5 shrink-0"
+                          aria-hidden="true"
+                          style={{ color: "var(--chart-cat-3, #d97706)" }}
+                        />
+                        <span
+                          className="font-mono text-[11px] font-semibold shrink-0"
+                          style={{ color: "var(--chart-cat-3, #d97706)" }}
+                        >
+                          {plan.wombat_id}
+                        </span>
+                        <span
+                          className="flex-1 min-w-0 truncate text-[13px]"
+                          style={{ color: "var(--fg-default)" }}
+                        >
+                          {plan.title}
+                        </span>
+                      </Command.Item>
+                    ))}
+                  </Command.Group>
+                </div>
+              )
+            ) : /* ---- JUMP-TO-RUN mode ---- */
+            mode === "jump-to-run" ? (
               debouncedQuery.length < 2 ? (
                 <Command.Empty>
                   <div
@@ -489,6 +660,127 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                           Jump to run by title
                         </span>
                         <ActionHint>→</ActionHint>
+                      </Command.Item>
+                    </Command.Group>
+
+                    {/* SP3.4 — Plans & Suites group */}
+                    <Command.Group
+                      heading={
+                        <span
+                          className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider block"
+                          style={{ color: "var(--fg-muted)" }}
+                        >
+                          Plans &amp; Suites
+                        </span>
+                      }
+                    >
+                      <Command.Item
+                        value="open dashboard project overview"
+                        onSelect={handleOpenDashboard}
+                        className={cn(
+                          "flex items-center gap-2.5 rounded-md px-3 py-2.5 cursor-pointer",
+                          "transition-colors duration-80 outline-none",
+                          "data-[selected=true]:bg-[color:var(--accent-soft)]",
+                        )}
+                        style={{ color: "var(--fg-default)" }}
+                      >
+                        <LayoutDashboard
+                          className="h-3.5 w-3.5 shrink-0"
+                          aria-hidden="true"
+                          style={{ color: "var(--accent-fg)" }}
+                        />
+                        <span className="flex-1 text-[13px]">Open dashboard</span>
+                      </Command.Item>
+
+                      <Command.Item
+                        value="open plans list all plans"
+                        onSelect={handleOpenPlans}
+                        className={cn(
+                          "flex items-center gap-2.5 rounded-md px-3 py-2.5 cursor-pointer",
+                          "transition-colors duration-80 outline-none",
+                          "data-[selected=true]:bg-[color:var(--accent-soft)]",
+                        )}
+                        style={{ color: "var(--fg-default)" }}
+                      >
+                        <ClipboardList
+                          className="h-3.5 w-3.5 shrink-0"
+                          aria-hidden="true"
+                          style={{ color: "var(--chart-cat-3, #d97706)" }}
+                        />
+                        <span className="flex-1 text-[13px]">Open plans</span>
+                      </Command.Item>
+
+                      <Command.Item
+                        value="new plan create plan"
+                        onSelect={handleNewPlan}
+                        className={cn(
+                          "flex items-center gap-2.5 rounded-md px-3 py-2.5 cursor-pointer",
+                          "transition-colors duration-80 outline-none",
+                          "data-[selected=true]:bg-[color:var(--accent-soft)]",
+                        )}
+                        style={{ color: "var(--fg-default)" }}
+                      >
+                        <ClipboardList
+                          className="h-3.5 w-3.5 shrink-0"
+                          aria-hidden="true"
+                          style={{ color: "var(--chart-cat-3, #d97706)" }}
+                        />
+                        <span className="flex-1 text-[13px]">New plan</span>
+                      </Command.Item>
+
+                      <Command.Item
+                        value="resolve plan cases navigate find plan"
+                        onSelect={handleEnterResolvePlan}
+                        className={cn(
+                          "flex items-center gap-2.5 rounded-md px-3 py-2.5 cursor-pointer",
+                          "transition-colors duration-80 outline-none",
+                          "data-[selected=true]:bg-[color:var(--accent-soft)]",
+                        )}
+                        style={{ color: "var(--fg-default)" }}
+                      >
+                        <MoveRight
+                          className="h-3.5 w-3.5 shrink-0"
+                          aria-hidden="true"
+                          style={{ color: "var(--chart-cat-3, #d97706)" }}
+                        />
+                        <span className="flex-1 text-[13px]">Resolve plan…</span>
+                        <ActionHint>→</ActionHint>
+                      </Command.Item>
+
+                      <Command.Item
+                        value="open suites list all suites"
+                        onSelect={handleOpenSuites}
+                        className={cn(
+                          "flex items-center gap-2.5 rounded-md px-3 py-2.5 cursor-pointer",
+                          "transition-colors duration-80 outline-none",
+                          "data-[selected=true]:bg-[color:var(--accent-soft)]",
+                        )}
+                        style={{ color: "var(--fg-default)" }}
+                      >
+                        <Layers
+                          className="h-3.5 w-3.5 shrink-0"
+                          aria-hidden="true"
+                          style={{ color: "var(--chart-cat-2, #0891b2)" }}
+                        />
+                        <span className="flex-1 text-[13px]">Open suites</span>
+                      </Command.Item>
+
+                      <Command.Item
+                        value="new suite create suite"
+                        onSelect={handleNewSuite}
+                        className={cn(
+                          "flex items-center gap-2.5 rounded-md px-3 py-2.5 cursor-pointer",
+                          "transition-colors duration-80 outline-none",
+                          "data-[selected=true]:bg-[color:var(--accent-soft)]",
+                        )}
+                        style={{ color: "var(--fg-default)" }}
+                      >
+                        <Layers
+                          className="h-3.5 w-3.5 shrink-0"
+                          aria-hidden="true"
+                          style={{ color: "var(--chart-cat-2, #0891b2)" }}
+                        />
+                        <span className="flex-1 text-[13px]">New suite</span>
                       </Command.Item>
                     </Command.Group>
                   </div>
@@ -640,9 +932,13 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
               >
                 ↵
               </kbd>
-              {mode === "jump-to-run" ? "open run" : "open"}
+              {mode === "jump-to-run"
+                ? "open run"
+                : mode === "resolve-plan"
+                  ? "open plan"
+                  : "open"}
             </span>
-            {mode === "jump-to-run" && (
+            {(mode === "jump-to-run" || mode === "resolve-plan") && (
               <span className="flex items-center gap-1">
                 <kbd
                   className="rounded px-1 py-0.5 font-mono"
