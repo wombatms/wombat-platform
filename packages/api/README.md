@@ -194,3 +194,95 @@ API tokens with `publish_direct=true` skip the proposal review step and commit s
 When a direct-publish token commits a change, the commit message includes the `Published-directly-by:` and `Purpose:` trailers so `git log` on `origin/main` always shows the bypass chain.
 
 To revoke a direct-publish token without losing audit history, use `DELETE /api/auth/tokens/:id` — existing proposal_event rows retain the purpose string even after the token row is removed.
+
+## SP3.4 surface — Planning + Dashboards
+
+SP3.4 is an **additive** phase with **zero new tables**. Plans and suites are rows in the existing `content` table (`kind='plan' | 'suite'`). Writes flow through SP3.2's `POST /proposals`. Migration `007_sp3_4_planning_dashboards` is indexes-only plus a defensive one-shot reshape of any legacy `plan.body.explicit_cases` rows.
+
+### Subpackages
+
+| Path | Purpose |
+|------|---------|
+| `src/wombat_api/planning/` | `ResolveService`, `/content/resolve`, plan/suite `resolve`/`clone`/`start-run` helpers. Reuses SP3.2 `ContentService` + `ProposalService`. |
+| `src/wombat_api/dashboards/` | `WidgetRegistry`, five widget query functions under `dashboards/widgets/`, `/dashboards/widget/{slug}` dispatcher. |
+
+### Widget registration contract
+
+Each widget is a `(meta, query)` pair registered at import time. `meta` declares its slug, title, supported scopes (`project` | `plan`), and required filter keys (e.g. `release_readiness` requires `plan_id` on `scope=project`).
+
+```python
+# packages/api/src/wombat_api/dashboards/widgets/my_widget.py
+from wombat_api.dashboards.registry import REGISTRY, WidgetMeta
+
+async def query(scope, filters, session):
+    # return a plain dict; shape is opaque to the registry
+    ...
+
+META: WidgetMeta = {
+    "slug": "my_widget",
+    "title": "My widget",
+    "scope_kinds": {"project", "plan"},
+    "requires": [],
+}
+
+REGISTRY.register(META, query)
+```
+
+Add a sixth widget: write the module, import it in `dashboards/widgets/__init__.py` to trigger registration, and add a matching React component in `apps/web/src/features/dashboards/widgets/`. No core route changes required.
+
+### Performance targets
+
+- `POST /content/resolve` — **p95 < 300 ms** at project with ≤ 2,000 content rows and suite depth ≤ 5.
+- `GET /dashboards/widget/{slug}` — **p95 < 500 ms** per widget at ≤ 5,000 results in window.
+- Widget breaches trigger the explicit follow-up to move that widget to a pre-aggregated rollup table (see `Deferred follow-ups` below).
+- Each resolve + widget query emits a structured log line with project, filter hash, and duration for percentile calibration.
+
+### Indexes added by migration 007
+
+All are additive; the migration only creates an index if one of the same name doesn't already exist.
+
+| Index | Table | Widgets served |
+|-------|-------|----------------|
+| `ix_results_run_finished` | `results (run_id, updated_at DESC)` | `passfail_trend`, `top_failing_cases` |
+| `ix_runs_project_finished` | `runs (project_id, closed_at DESC NULLS LAST)` | `recent_runs` |
+| `ix_runs_project_plan_finished` | `runs (project_id, plan_id, closed_at DESC NULLS LAST)` | plan-home + `release_readiness` |
+| `ix_proposals_project_status` | `proposals (project_id, status)` | `review_backlog` |
+| `ix_runs_environment_finished` | `runs (environment_id, closed_at DESC NULLS LAST)` | env-filtered widgets |
+
+Expression indexes (`DESC NULLS LAST`) are Postgres-only; the migration falls back to a plain column list on SQLite test fixtures.
+
+### Permission model — no new slugs
+
+SP3.4 reuses the existing permission matrix. No changes to `packages/api/src/wombat_api/rbac/permissions.py`.
+
+- Plan / suite reads — authenticated + project-scoped (same as any content read).
+- Plan / suite writes — `content:propose` (route `POST /proposals` with `kind=plan|suite`) or `content:publish_direct` (bypass).
+- Dashboard widgets that read runs/results — `runs:read`.
+- Runs launched from a plan — `runs:create`.
+
+### Suite hierarchy — single-parent tree, cycle-safe writes
+
+`Suite.parent_wombat_id` is optional and must reference another suite in the same project. Cycle prevention runs at two layers:
+
+1. **Lint (Git-source writes)** — `SUITE_CYCLE`, `SUITE_SELF_PARENT`, `PLAN_SUITE_REF_UNKNOWN` rules in `wombat_core.linting.rules.suite_hierarchy`.
+2. **Service (API proposals)** — `_validate_suite_proposal` in `routes/proposals.py` walks the parent chain at proposal-create time; rejects self-reference, cycles, and cross-project parents with `SUITE_CYCLE` / `SUITE_PARENT_OTHER_PROJECT` (HTTP 422).
+
+Resolution depth is hard-capped at 20 (defensive; cycle check is primary). `Repository.list_suite_subtree` uses a recursive Postgres CTE in one round-trip; the SQLite test path falls back to Python iteration.
+
+### MCP additions (SP3.4)
+
+Four new tools are registered in `packages/mcp/` (surface: 31 → 35 tools):
+
+- `save_plan` / `save_suite` — proposal write via the same SP3.2 flow
+- `resolve_plan` — preview a plan body (or stored `wombat_id`) before saving
+- `get_dashboard_widget` — fetch a widget's data shape by slug
+
+### Deferred follow-ups surfaced during SP3.4
+
+| # | Item | Trigger to address |
+|---|---|---|
+| 1 | `CreateRunRequest.plan_id` field | Plan→Run handoff currently pre-fills the form; server doesn't persist `plan_id` on submit. Small backend patch — `runs.plan_id` column already exists since SP3.3. |
+| 2 | `/testcases?suite_ref=` server-side filter | Library suites sidebar filters client-side today. Add when suite subtrees grow large. |
+| 3 | `/components` catalog endpoint | `FilterBuilder` uses free-text. Add once `component` is a first-class field. |
+| 4 | Pre-aggregated widget rollups | Revisit when any widget p95 exceeds 500 ms. |
+| 5 | Plan version-diff UI + rollup tables for release readiness | When users ask for side-by-side plan comparisons or release readiness feels slow. |
