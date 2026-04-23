@@ -151,7 +151,7 @@ test.describe("Plan-start-run flow", () => {
   test("navigate from plan detail, click Start run, RunCreatePage shows plan badge, submit run, verify in list", async ({
     page,
     applyTheme,
-    request,
+    request: _request,
   }) => {
     await applyTheme();
 

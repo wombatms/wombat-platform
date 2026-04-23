@@ -23,7 +23,7 @@ const API_BASE = process.env["WOMBAT_API_URL"] ?? "http://localhost:8000";
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function login(): Promise<string> {
+async function _login(): Promise<string> {
   const res = await fetch(`${API_BASE}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -34,7 +34,7 @@ async function login(): Promise<string> {
   return data.access_token;
 }
 
-async function apiGet(path: string, token: string): Promise<unknown> {
+async function _apiGet(path: string, token: string): Promise<unknown> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
