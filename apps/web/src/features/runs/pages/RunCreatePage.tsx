@@ -8,6 +8,32 @@
  *
  * Source defaults to "manual"; URL param `?source=ci` overrides the visible label
  * but the field is read-only and hidden from the form (per SP3.3 spec §8.4).
+ *
+ * SP3.4 — Plan draft pre-fill (Task 53):
+ *   When navigated from a plan's "Start run" button the router passes
+ *   `{ state: { planDraft: StartRunDraft } }`.  If present:
+ *     - title_suggestion → pre-fills the title field.
+ *     - environment_id   → pre-selects the environment.
+ *     - assignee_user_ids / assignee_token_ids → pre-selects assignees.
+ *     - resolved_case_ids → pre-selects cases in the CaseSelector.
+ *     - A dismissible "Plan: <title>" context strip is rendered below the header.
+ *   Dismissing the strip clears only the plan attribution; already-filled form
+ *   values are retained.
+ *
+ *   plan_id submission note: the backend's CreateRunRequest schema (generated
+ *   2026-04-22) does not include a `plan_id` field.  The plan attribution is
+ *   therefore stored purely as form pre-fill context; the run is created without
+ *   a plan_id.  When the backend adds the field (tracked in deferred backlog),
+ *   update CreateRunBody + useCreateRun to thread it through.
+ *
+ * Design decisions (frontend-design skill, Task 53):
+ *   - Context strip uses a left-border accent rather than a floating pill so it
+ *     reads as document context, not a transient notification.
+ *   - Token: `var(--chart-cat-3)` for the plan accent bar (warm amber) — distinct
+ *     from the green success / red error / blue info feedback tokens.
+ *   - Strip slides in via a short max-height animation to avoid layout jump on
+ *     non-plan entry points.
+ *   - Dismiss X is keyboard-accessible with focus-visible ring.
  */
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
@@ -15,15 +41,18 @@ import {
   useNavigate,
   useParams,
   useSearchParams,
+  useLocation,
   Link,
 } from "react-router-dom";
 import {
   AlertCircle,
   ChevronLeft,
+  ClipboardList,
   Loader2,
   Plus,
   X,
 } from "lucide-react";
+import type { StartRunDraft } from "@/features/plans/hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ErrorState } from "@/components/shared/ErrorState";
@@ -42,16 +71,38 @@ export function RunCreatePage() {
   const { projectSlug = "" } = useParams<{ projectSlug: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Source from URL param (read-only; not surfaced as editable in the UI)
   const source = searchParams.get("source") ?? "manual";
 
-  // Form state
-  const [title, setTitle] = useState("");
-  const [envId, setEnvId] = useState<string | null>(null);
-  const [userIds, setUserIds] = useState<string[]>([]);
-  const [tokenIds, setTokenIds] = useState<string[]>([]);
-  const [selectedCases, setSelectedCases] = useState<Set<string>>(new Set());
+  // SP3.4 — Plan draft pre-fill. Read once on mount; never re-read on re-renders.
+  const planDraft = (location.state as { planDraft?: StartRunDraft } | null)
+    ?.planDraft ?? null;
+
+  // Whether the plan attribution banner is still visible (user may dismiss it)
+  const [planBannerVisible, setPlanBannerVisible] = useState(
+    () => planDraft !== null,
+  );
+
+  // Form state — initialised from plan draft when present
+  const [title, setTitle] = useState(() => planDraft?.title ?? "");
+  const [envId, setEnvId] = useState<string | null>(
+    () => planDraft?.environment_id ?? null,
+  );
+  const [userIds, setUserIds] = useState<string[]>(
+    () => planDraft?.assignee_user_ids ?? [],
+  );
+  const [tokenIds, setTokenIds] = useState<string[]>(
+    () => planDraft?.assignee_token_ids ?? [],
+  );
+
+  // Initial cases from plan draft (passed to CaseSelector as pre-selected)
+  const initialCaseIds = planDraft?.resolved_case_ids ?? [];
+
+  const [selectedCases, setSelectedCases] = useState<Set<string>>(
+    () => new Set(initialCaseIds),
+  );
 
   // Submit state
   const [submitError, setSubmitError] = useState<Error | null>(null);
@@ -152,6 +203,16 @@ export function RunCreatePage() {
         )}
       </header>
 
+      {/* SP3.4 — Plan context strip (only when navigated from a plan's "Start run") */}
+      {planDraft && planBannerVisible && (
+        <PlanContextStrip
+          planWombatId={planDraft.plan_wombat_id}
+          title={planDraft.title}
+          caseCount={planDraft.resolved_case_count}
+          onDismiss={() => setPlanBannerVisible(false)}
+        />
+      )}
+
       {/* Two-column body — scrolls as a unit */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left column — metadata */}
@@ -193,6 +254,7 @@ export function RunCreatePage() {
             projectSlug={projectSlug}
             onSelectionChange={setSelectedCases}
             className="flex-1 min-h-0"
+            initialSelectedIds={initialCaseIds.length > 0 ? initialCaseIds : undefined}
           />
         </main>
       </div>
@@ -602,6 +664,109 @@ function InlineError({ error, onDismiss }: InlineErrorProps) {
         style={{ color: "var(--feedback-error-fg)" }}
       >
         <X className="h-3.5 w-3.5" aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// PlanContextStrip — SP3.4 plan-to-run handoff attribution banner
+// ---------------------------------------------------------------------------
+//
+// Design (frontend-design skill, Task 53):
+//   Uses a left-border accent bar (var(--chart-cat-3)) rather than a pill or
+//   floating badge so the strip reads as document-level context, not a
+//   transient notification that demands action.  The amber accent token
+//   (warm, editorial) is visually distinct from the blue/green/red feedback
+//   tokens the rest of the form uses.  The strip is keyboard-dismissible and
+//   slides in via max-height to avoid layout jump on non-plan entry points.
+
+interface PlanContextStripProps {
+  planWombatId: string;
+  title: string;
+  caseCount: number;
+  onDismiss: () => void;
+}
+
+function PlanContextStrip({
+  planWombatId,
+  title,
+  caseCount,
+  onDismiss,
+}: PlanContextStripProps) {
+  return (
+    <div
+      role="status"
+      aria-label={`Prefilled from plan: ${title}`}
+      className="flex items-center gap-3 px-5 py-2.5 text-xs shrink-0"
+      style={{
+        borderBottom: "1px solid var(--border-default)",
+        borderLeft: "3px solid var(--chart-cat-3, #d97706)",
+        background: "color-mix(in srgb, var(--chart-cat-3, #d97706) 6%, var(--bg-surface-1))",
+        /* Slide-in animation for plan-entry path (no-op for non-plan path since
+           component only renders when planDraft !== null). */
+        animation: "plan-strip-in 200ms ease-out both",
+      }}
+    >
+      <style>{`
+        @keyframes plan-strip-in {
+          from { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; }
+          to   { opacity: 1; max-height: 3rem; padding-top: 0.625rem; padding-bottom: 0.625rem; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          @keyframes plan-strip-in { from { opacity: 0; } to { opacity: 1; } }
+        }
+      `}</style>
+
+      <ClipboardList
+        className="h-3.5 w-3.5 shrink-0"
+        aria-hidden="true"
+        style={{ color: "var(--chart-cat-3, #d97706)" }}
+      />
+
+      <span style={{ color: "var(--fg-muted)" }}>
+        Prefilled from plan
+      </span>
+
+      <span
+        className="font-mono text-[11px] font-semibold"
+        style={{ color: "var(--chart-cat-3, #d97706)" }}
+      >
+        {planWombatId}
+      </span>
+
+      <span
+        className="font-medium truncate min-w-0 flex-1"
+        style={{ color: "var(--fg-default)" }}
+      >
+        {title}
+      </span>
+
+      {caseCount > 0 && (
+        <span
+          className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums"
+          style={{
+            background: "color-mix(in srgb, var(--chart-cat-3, #d97706) 15%, var(--bg-surface-2))",
+            color: "var(--chart-cat-3, #d97706)",
+            border: "1px solid color-mix(in srgb, var(--chart-cat-3, #d97706) 30%, transparent)",
+          }}
+        >
+          {caseCount} {caseCount === 1 ? "case" : "cases"}
+        </span>
+      )}
+
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss plan context"
+        className={cn(
+          "shrink-0 rounded p-0.5 outline-none",
+          "focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)]",
+          "transition-opacity duration-150 hover:opacity-70",
+        )}
+        style={{ color: "var(--fg-muted)" }}
+      >
+        <X className="h-3 w-3" aria-hidden="true" />
       </button>
     </div>
   );

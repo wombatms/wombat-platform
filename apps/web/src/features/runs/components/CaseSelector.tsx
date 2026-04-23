@@ -25,14 +25,25 @@ export interface CaseSelectorProps {
   /** Called whenever the selected set changes. */
   onSelectionChange: (selected: Set<string>) => void;
   className?: string;
+  /**
+   * SP3.4 — Optional pre-selected case IDs from a plan draft.
+   * Seeded once on mount; changes after mount are ignored (uncontrolled pattern).
+   */
+  initialSelectedIds?: string[];
 }
 
 export function CaseSelector({
   projectSlug,
   onSelectionChange,
   className,
+  initialSelectedIds,
 }: CaseSelectorProps) {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(
+    () =>
+      initialSelectedIds && initialSelectedIds.length > 0
+        ? new Set(initialSelectedIds)
+        : new Set(),
+  );
   const [activeTab, setActiveTab] = useState<CaseSelectorTab>("filter");
 
   // Toggle a single ID
