@@ -601,3 +601,122 @@ async def test_suite_cases_and_filter_union(repo, project, db_session):
     wids = {c.wombat_id for c in out.cases}
     assert "TC-EXPLICIT" in wids
     assert "TC-FILTER-MATCH" in wids
+
+
+# ===========================================================================
+# Task 20: Edge-case coverage (SP3.4)
+# ===========================================================================
+
+
+async def test_exclude_beats_explicit_add(repo, project, seed):
+    """When a case is in both explicit_add and the exclude filter, exclude wins.
+
+    Composition order (spec §4.4):
+      1. filter_set → sources
+      2. suite_set (setdefault)
+      3. explicit_add (setdefault)
+      4. subtract: exclude_set | remove_ids
+
+    So even though TC-AUTH-1 is in explicit_add, the exclude filter runs after
+    and removes it from sources.
+    """
+    # explicit_add=TC-AUTH-1; exclude=tags_any:["auth"] → TC-AUTH-1 excluded.
+    body = _plan_body(add=["TC-AUTH-1"], exclude_tags=["auth"])
+    out = await ResolveService(repo).resolve_plan(project.id, body)
+    wids = {c.wombat_id for c in out.cases}
+    assert "TC-AUTH-1" not in wids, "exclude_set must beat explicit_add"
+    # Nothing else should appear either (no include filter).
+    assert out.cases == []
+
+
+async def test_deleted_content_rows_excluded(repo, project, db_session, seed):
+    """Soft-deleted content rows (deleted_at IS NOT NULL) must not appear in resolved output.
+
+    The _match_filter query already includes ``Content.deleted_at.is_(None)``.
+    This test asserts the semantic at the resolve level.
+    """
+    from datetime import UTC, datetime
+
+    from sqlalchemy import select
+
+    from wombat_api.database.models import Content
+
+    # Soft-delete TC-PAY-1
+    q = select(Content).where(Content.wombat_id == "TC-PAY-1")
+    row = (await db_session.execute(q)).scalar_one()
+    row.deleted_at = datetime.now(UTC)
+    await db_session.flush()
+
+    body = _plan_body(tags_any=["payments"])
+    out = await ResolveService(repo).resolve_plan(project.id, body)
+    wids = {c.wombat_id for c in out.cases}
+    assert "TC-PAY-1" not in wids, "deleted rows must be excluded from filter results"
+    assert "TC-PAY-2" in wids, "non-deleted payments case must still appear"
+
+
+async def test_depth_5_suite_hierarchy_resolves_all_cases(repo, project, db_session):
+    """A 5-level suite hierarchy resolves all descendant cases correctly.
+
+    Structure:
+      SUITE-D1 (root) — no cases
+        SUITE-D2 — TC-DEPTH-2
+          SUITE-D3 — TC-DEPTH-3
+            SUITE-D4 — TC-DEPTH-4
+              SUITE-D5 — TC-DEPTH-5
+
+    resolve_suite("SUITE-D1") must return all four testcases.
+    """
+    for i in range(2, 6):
+        await _make_testcase(db_session, project, f"TC-DEPTH-{i}")
+
+    # Build hierarchy bottom-up so parent refs already exist.
+    await _make_suite(db_session, project, "SUITE-D5", cases=["TC-DEPTH-5"])
+    await _make_suite(db_session, project, "SUITE-D4", cases=["TC-DEPTH-4"], parent="SUITE-D3")
+    await _make_suite(db_session, project, "SUITE-D3", cases=["TC-DEPTH-3"], parent="SUITE-D2")
+    await _make_suite(db_session, project, "SUITE-D2", cases=["TC-DEPTH-2"], parent="SUITE-D1")
+
+    # Update SUITE-D5 to set parent to SUITE-D4.
+    from sqlalchemy import select
+
+    d5_q = select(Content).where(Content.wombat_id == "SUITE-D5")
+    d5_row = (await db_session.execute(d5_q)).scalar_one()
+    d5_body = dict(d5_row.body)
+    d5_body["parent_wombat_id"] = "SUITE-D4"
+    d5_row.body = d5_body
+    await db_session.flush()
+
+    # Root suite (no parent, no cases of its own).
+    await _make_suite(db_session, project, "SUITE-D1", cases=[])
+
+    out = await ResolveService(repo).resolve_suite(project.id, "SUITE-D1")
+    wids = {c.wombat_id for c in out.cases}
+    for i in range(2, 6):
+        assert f"TC-DEPTH-{i}" in wids, f"TC-DEPTH-{i} must be resolved in 5-level hierarchy"
+    assert out.count == 4
+
+
+async def test_determinism_across_multiple_calls(repo, project, seed):
+    """resolve_plan called N times with the same body returns the same case order each time.
+
+    Extends the existing determinism test by running 5 calls and comparing all.
+    """
+    body = _plan_body(tags_any=["payments"])
+    svc = ResolveService(repo)
+    results = [await svc.resolve_plan(project.id, body) for _ in range(5)]
+    wid_lists = [[c.wombat_id for c in r.cases] for r in results]
+    # All five calls must return the same ordered list.
+    for i, wids in enumerate(wid_lists[1:], start=1):
+        assert wids == wid_lists[0], f"Call {i+1} produced a different order: {wids} vs {wid_lists[0]}"
+
+
+async def test_empty_plan_body_is_empty_no_crash(repo, project, seed):
+    """An entirely empty plan body (missing keys) resolves to [] without raising.
+
+    The service must treat missing keys as empty/absent, not crash on KeyError.
+    """
+    # {} has no 'include', 'exclude', 'suite_refs', 'explicit_cases' keys.
+    body = {}
+    out = await ResolveService(repo).resolve_plan(project.id, body)
+    assert out.cases == []
+    assert out.count == 0
+    assert out.warnings == []
