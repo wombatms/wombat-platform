@@ -1584,7 +1584,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "testcase" | "shared_step" | "story";
+            kind: "testcase" | "shared_step" | "story" | "plan" | "suite";
             /** Content Id */
             content_id?: string | null;
             /** Source Path */

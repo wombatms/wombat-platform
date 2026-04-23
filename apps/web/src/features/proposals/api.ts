@@ -69,7 +69,7 @@ export interface ProposalListPage {
 }
 
 export interface ProposalCreateBody {
-  kind: "testcase" | "shared_step" | "story";
+  kind: "testcase" | "shared_step" | "story" | "plan" | "suite";
   content_id?: string;
   source_path: string;
   base_revision: string;
