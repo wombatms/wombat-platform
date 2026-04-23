@@ -1350,6 +1350,181 @@
         }
       }
     },
+    "/api/projects/{project_slug}/plans/{wombat_id}/resolve": {
+      "get": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Resolve Plan",
+        "description": "Return the ResolvedPlan for the published plan body.\n\nLoads the most-recent published plan content row and runs it through\nResolveService.  No draft body is accepted here; use\nPOST /{project_slug}/content/resolve for draft-preview.\n\nPermissions: viewer or higher (content read is authenticated + project-scoped).",
+        "operationId": "resolve_plan_api_projects__project_slug__plans__wombat_id__resolve_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Slug"
+            }
+          },
+          {
+            "name": "wombat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Wombat Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{project_slug}/plans/{wombat_id}/clone": {
+      "post": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Clone Plan",
+        "description": "Deep-copy a plan body into a new proposal with a new wombat_id.\n\nThe clone is submitted as a proposal with kind='plan'.  The caller must\nhave content:propose permission (editor or admin by default).\n\nThe resulting proposal is open and waiting for review/approval through the\nexisting SP3.2 proposal flow.\n\nPermissions: content:propose (editor+)",
+        "operationId": "clone_plan_api_projects__project_slug__plans__wombat_id__clone_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Slug"
+            }
+          },
+          {
+            "name": "wombat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Wombat Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClonePlanRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{project_slug}/plans/{wombat_id}/start-run": {
+      "post": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Start Run Draft",
+        "description": "Return a pre-filled run-creation draft derived from the plan.\n\nDoes NOT create a run.  The caller passes the returned StartRunDraft to\nPOST /runs to actually create the run.  This endpoint only hydrates the\nrun-create form with the plan's environments, assignees, and resolved case\ncount.\n\nPermissions: viewer or higher (content read is authenticated + project-scoped).",
+        "operationId": "start_run_draft_api_projects__project_slug__plans__wombat_id__start_run_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Slug"
+            }
+          },
+          {
+            "name": "wombat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Wombat Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/projects/{project_slug}/stories": {
       "get": {
         "tags": [
@@ -1583,6 +1758,107 @@
               "minimum": 0,
               "default": 0,
               "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{project_slug}/suites/tree": {
+      "get": {
+        "tags": [
+          "content"
+        ],
+        "summary": "List Suite Tree",
+        "description": "Return all suite rows as a flat node list.\n\nEach node exposes exactly three fields:\n- ``wombat_id`` \u2014 the suite's unique ID\n- ``title``     \u2014 display name\n- ``parent_wombat_id`` \u2014 parent's wombat_id, or null for root suites\n\nClients build the tree structure client-side from this flat representation.\nNo pagination: suite hierarchies are bounded (depth \u2264 20, breadth \u2264 project\ncontent count) and the flat list is cheap to fetch.\n\nPermissions: viewer or higher.",
+        "operationId": "list_suite_tree_api_projects__project_slug__suites_tree_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{project_slug}/suites/{wombat_id}/resolve": {
+      "get": {
+        "tags": [
+          "content"
+        ],
+        "summary": "Resolve Suite",
+        "description": "Return the ResolvedSuite for a suite root (including its full subtree).\n\nUses ResolveService.resolve_suite which performs a recursive BFS over the\nsuite hierarchy.  Returns cases contributed by the root suite and all\ndescendant suites.\n\nPermissions: viewer or higher (content read is authenticated + project-scoped).",
+        "operationId": "resolve_suite_api_projects__project_slug__suites__wombat_id__resolve_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Slug"
+            }
+          },
+          {
+            "name": "wombat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Wombat Id"
             }
           }
         ],
@@ -2702,6 +2978,241 @@
         }
       }
     },
+    "/api/projects/{project_slug}/content/resolve": {
+      "post": {
+        "tags": [
+          "planning"
+        ],
+        "summary": "Resolve Draft",
+        "description": "Draft plan or suite preview endpoint.\n\nAccepts an unsaved draft body and returns the resolved case set\n**without persisting anything** \u2014 no proposal rows, no content rows.\n\nThis is the live-preview transport used by the builder form while the\nuser is still editing.  The response shape is identical to the saved-plan\nresolve endpoint (GET /api/projects/{project_slug}/plans/{wombat_id}/resolve) so the\nfrontend can reuse the same response handler.\n\nBehaviour by ``kind``:\n- ``\"plan\"`` \u2014 delegates to ``ResolveService.resolve_plan``, which runs the\n  full filter / suite-ref / explicit-cases composition pipeline.\n- ``\"suite\"`` \u2014 synthesises a suite in memory from the draft's ``cases``\n  list + ``include`` filter, resolves titles and returns a ``ResolvedSuite``.\n  If the draft body has ``parent_wombat_id``, the draft resolution does NOT\n  recurse into the unsaved parent chain; drafts stand alone.  This is by\n  design: the parent doesn't exist in the DB yet, so there's nothing to\n  walk.\n- anything else \u2192 422.\n\nAuth: any project viewer may call this endpoint (read-only; same auth as\n``GET /api/projects/{project_slug}/plans``).",
+        "operationId": "resolve_draft_api_projects__project_slug__content_resolve_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Slug"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftResolveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{project_slug}/dashboards/widgets": {
+      "get": {
+        "tags": [
+          "dashboards"
+        ],
+        "summary": "List Widgets",
+        "description": "Return metadata for all registered dashboard widgets.\n\nCallers use this to discover which widgets exist, what scopes they support,\nand what filters (if any) are required.\n\nResponse::\n\n    {\n        \"widgets\": [\n            {\n                \"slug\": \"passfail_trend\",\n                \"title\": \"Pass / fail trend\",\n                \"scope_kinds\": [\"plan\", \"project\"],\n                \"requires\": []\n            },\n            \u2026\n        ]\n    }",
+        "operationId": "list_widgets_api_projects__project_slug__dashboards_widgets_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{project_slug}/dashboards/widget/{slug}": {
+      "get": {
+        "tags": [
+          "dashboards"
+        ],
+        "summary": "Get Widget",
+        "description": "Dispatch a widget query and return its result.\n\nValidation order:\n1. 404 if slug not registered.\n2. 400 if scope not in ``meta[\"scope_kinds\"]``.\n3. 400 if any key in ``meta[\"requires\"]`` is missing from the effective filters\n   when scope is ``\"project\"`` (on plan scope the plan is already in scope_id).\n4. Build ``WidgetScope`` and ``WidgetFilters``, then call the widget query.",
+        "operationId": "get_widget_api_projects__project_slug__dashboards_widget__slug__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Slug"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "project",
+                "plan"
+              ],
+              "type": "string",
+              "description": "Widget scope kind",
+              "title": "Scope"
+            },
+            "description": "Widget scope kind"
+          },
+          {
+            "name": "scope_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Project UUID (project scope) or plan wombat_id (plan scope)",
+              "title": "Scope Id"
+            },
+            "description": "Project UUID (project scope) or plan wombat_id (plan scope)"
+          },
+          {
+            "name": "window",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Time window: 7d | 30d | 90d | all",
+              "default": "30d",
+              "title": "Window"
+            },
+            "description": "Time window: 7d | 30d | 90d | all"
+          },
+          {
+            "name": "env_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional environment UUID filter",
+              "title": "Env Id"
+            },
+            "description": "Optional environment UUID filter"
+          },
+          {
+            "name": "plan_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional plan wombat_id filter (project scope only)",
+              "title": "Plan Id"
+            },
+            "description": "Optional plan wombat_id filter (project scope only)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Widget Api Projects  Project Slug  Dashboards Widget  Slug  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/projects/{project_slug}/runs": {
       "post": {
         "tags": [
@@ -3624,6 +4135,68 @@
       }
     },
     "/api/projects/{project_slug}/runs/{run_id}/results/{case_id}/evidence": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "List Result Evidence",
+        "description": "List evidence records attached to a specific run result.\n\nReturns all evidence attached to the result for the given case in the given\nrun, ordered by upload time ascending.  Each record carries id, filename,\nmime_type, size_bytes, uploaded_by, and uploaded_at \u2014 callers use\nGET /api/evidence/{id}/url to obtain a presigned download URL.",
+        "operationId": "list_result_evidence_api_projects__project_slug__runs__run_id__results__case_id__evidence_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Slug"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "runs"
@@ -3851,7 +4424,7 @@
           "evidence"
         ],
         "summary": "Get Evidence Url",
-        "description": "Return a presigned URL for the given evidence record.\n\nJoins evidence \u2192 result \u2192 run \u2192 project to verify the caller has\nRUNS_READ on the parent project.  Returns {url, expires_at}.",
+        "description": "Return a presigned URL for the given evidence record.\n\nJoins evidence \u2192 result \u2192 run \u2192 project to verify the evidence exists.\nReturns {url, expires_at}.\n\nNOTE: Auth is intentionally omitted here \u2014 the signed URL itself (for\nLocalFS: HMAC sig+exp; for S3: AWS presigned URL) is the security boundary.\nA future iteration can plumb proper RUNS_READ auth once the endpoint URL\nmoves under /projects/{slug}.",
         "operationId": "get_evidence_url_api_evidence__evidence_id__url_get",
         "parameters": [
           {
@@ -3861,6 +4434,65 @@
             "schema": {
               "type": "string",
               "title": "Evidence Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evidence/{blob_path}/url": {
+      "get": {
+        "tags": [
+          "evidence"
+        ],
+        "summary": "Serve Localfs Blob",
+        "description": "Serve a LocalFS evidence blob after HMAC signature validation.\n\nThis endpoint is the \"download\" counterpart to LocalFSBackend.get_url().\nIt is intentionally unauthenticated \u2014 the HMAC signature (keyed by the\nsigning_key configured for the LocalFSBackend) acts as the bearer credential.\n\nArgs:\n    blob_path: URL-decoded blob identifier, e.g. ``{project_id}/{sha}.ext``.\n    sig: HMAC-SHA256 hex digest of ``\"{blob_id}:{exp}\"``.\n    exp: Unix epoch seconds at which the URL expires.",
+        "operationId": "serve_localfs_blob_evidence__blob_path__url_get",
+        "parameters": [
+          {
+            "name": "blob_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Blob Path"
+            }
+          },
+          {
+            "name": "sig",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sig"
+            }
+          },
+          {
+            "name": "exp",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Exp"
             }
           }
         ],
@@ -4137,6 +4769,30 @@
         "title": "CaseSelection",
         "description": "Exactly one of `filter` or `case_ids` must be provided."
       },
+      "ClonePlanRequest": {
+        "properties": {
+          "new_wombat_id": {
+            "type": "string",
+            "title": "New Wombat Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "new_wombat_id"
+        ],
+        "title": "ClonePlanRequest"
+      },
       "CloseRunRequest": {
         "properties": {
           "reason": {
@@ -4362,6 +5018,26 @@
           "case_selection"
         ],
         "title": "CreateRunRequest"
+      },
+      "DraftResolveRequest": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "body": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Body"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "body"
+        ],
+        "title": "DraftResolveRequest",
+        "description": "Request body for ``POST /{project_slug}/content/resolve``.\n\nAccepts an unsaved draft body and returns the resolved case set without\npersisting anything."
       },
       "EnvironmentCreate": {
         "properties": {
