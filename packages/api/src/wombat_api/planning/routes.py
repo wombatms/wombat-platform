@@ -1,14 +1,14 @@
 """Planning routes.
 
 This module provides:
-- POST  /{project_slug}/content/resolve   (Task 10: draft preview, read-only)
+- POST  /api/projects/{project_slug}/content/resolve   (Task 10: draft preview, read-only)
 
-Additional endpoints (Tasks 8, 9) will be added by parallel agents:
-- POST  /{project_slug}/plans/{wombat_id}/clone
-- GET   /{project_slug}/plans/{wombat_id}/resolve
-- POST  /{project_slug}/plans/{wombat_id}/start-run
-- GET   /{project_slug}/suites/tree
-- GET   /{project_slug}/suites/{wombat_id}/resolve
+Additional endpoints (Tasks 8, 9) are in routes/plans.py and routes/suites.py:
+- POST  /api/projects/{project_slug}/plans/{wombat_id}/clone
+- GET   /api/projects/{project_slug}/plans/{wombat_id}/resolve
+- POST  /api/projects/{project_slug}/plans/{wombat_id}/start-run
+- GET   /api/projects/{project_slug}/suites/tree
+- GET   /api/projects/{project_slug}/suites/{wombat_id}/resolve
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ async def resolve_draft(
 
     This is the live-preview transport used by the builder form while the
     user is still editing.  The response shape is identical to the saved-plan
-    resolve endpoint (GET /{project_slug}/plans/{wombat_id}/resolve) so the
+    resolve endpoint (GET /api/projects/{project_slug}/plans/{wombat_id}/resolve) so the
     frontend can reuse the same response handler.
 
     Behaviour by ``kind``:
@@ -60,7 +60,7 @@ async def resolve_draft(
     - anything else → 422.
 
     Auth: any project viewer may call this endpoint (read-only; same auth as
-    ``GET /{project_slug}/plans``).
+    ``GET /api/projects/{project_slug}/plans``).
     """
     repo = Repository(session)
     svc = ResolveService(repo)

@@ -123,7 +123,7 @@ def _register_routes(app: FastAPI) -> None:
     # SP3.4 planning-tier routes.
     from wombat_api.planning import routes as planning_routes
 
-    app.include_router(planning_routes.router, prefix="/api", tags=["planning"])
+    app.include_router(planning_routes.router, prefix="/api/projects", tags=["planning"])
 
     # SP3.4 dashboard routes.
     from wombat_api.dashboards import routes as dashboards_routes

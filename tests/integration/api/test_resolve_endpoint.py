@@ -1,4 +1,4 @@
-"""Integration tests for POST /{project_slug}/content/resolve (Task 10, SP3.4).
+"""Integration tests for POST /api/projects/{project_slug}/content/resolve (Task 10, SP3.4).
 
 Covers:
 1. Draft plan resolve returns >= 1 case matching filter; zero proposal rows written.
@@ -149,7 +149,7 @@ async def test_draft_plan_resolve_returns_matching_cases_no_db_write(
     before = await _count_proposals(db_session, project.id)
 
     r = await httpx_client.post(
-        f"/api/{slug}/content/resolve",
+        f"/api/projects/{slug}/content/resolve",
         json={
             "kind": "plan",
             "body": {
@@ -189,7 +189,7 @@ async def test_draft_plan_resolve_unknown_suite_ref_warns_http_200(
     token = users["editor"]["token"]
 
     r = await httpx_client.post(
-        f"/api/{slug}/content/resolve",
+        f"/api/projects/{slug}/content/resolve",
         json={
             "kind": "plan",
             "body": {
@@ -220,7 +220,7 @@ async def test_draft_plan_resolve_unknown_explicit_add_warns_http_200(
     token = users["editor"]["token"]
 
     r = await httpx_client.post(
-        f"/api/{slug}/content/resolve",
+        f"/api/projects/{slug}/content/resolve",
         json={
             "kind": "plan",
             "body": {
@@ -251,7 +251,7 @@ async def test_draft_resolve_invalid_kind_returns_422(
     token = users["editor"]["token"]
 
     r = await httpx_client.post(
-        f"/api/{slug}/content/resolve",
+        f"/api/projects/{slug}/content/resolve",
         json={
             "kind": "other",
             "body": {"title": "Nope"},
@@ -286,7 +286,7 @@ async def test_draft_resolve_cross_project_returns_403(
 
     # token_a belongs to project A; using slug_b should be rejected.
     r = await httpx_client.post(
-        f"/api/{slug_b}/content/resolve",
+        f"/api/projects/{slug_b}/content/resolve",
         json={
             "kind": "plan",
             "body": {"title": "Draft", "include": {}, "suite_refs": [], "explicit_cases": {"add": [], "remove": []}},
@@ -318,7 +318,7 @@ async def test_draft_suite_resolve_explicit_cases(
     )
 
     r = await httpx_client.post(
-        f"/api/{slug}/content/resolve",
+        f"/api/projects/{slug}/content/resolve",
         json={
             "kind": "suite",
             "body": {
@@ -364,7 +364,7 @@ async def test_draft_suite_resolve_include_filter(
     )
 
     r = await httpx_client.post(
-        f"/api/{slug}/content/resolve",
+        f"/api/projects/{slug}/content/resolve",
         json={
             "kind": "suite",
             "body": {
@@ -394,7 +394,7 @@ async def test_draft_plan_resolve_unauthenticated_returns_401(
     _project, slug = seeded_project
 
     r = await httpx_client.post(
-        f"/api/{slug}/content/resolve",
+        f"/api/projects/{slug}/content/resolve",
         json={"kind": "plan", "body": {}},
     )
     # Could be 401 or 403 depending on auth middleware; either is correct.
@@ -413,7 +413,7 @@ async def test_draft_plan_resolve_viewer_allowed(
     token = users["viewer"]["token"]
 
     r = await httpx_client.post(
-        f"/api/{slug}/content/resolve",
+        f"/api/projects/{slug}/content/resolve",
         json={
             "kind": "plan",
             "body": {
@@ -452,7 +452,7 @@ async def test_draft_plan_resolve_combined_filter_and_explicit_add(
     )
 
     r = await httpx_client.post(
-        f"/api/{slug}/content/resolve",
+        f"/api/projects/{slug}/content/resolve",
         json={
             "kind": "plan",
             "body": {
